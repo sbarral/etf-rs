@@ -1,0 +1,7 @@
+[package]
+name = "etf"
+version = "0.1.0"
+authors = ["Serge Barral <sbarral@quintescience.com>"]
+
+[dependencies]
+rand = "0.5"
