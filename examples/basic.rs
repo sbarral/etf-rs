@@ -1,12 +1,11 @@
 extern crate etf;
 extern crate rand;
 
-use rand::{Rng, RngCore};
-
+use rand::Rng;
 
 fn main() {
     let table = etf::Table256 {
-        x: [0.0f64; 257],
+        partition: etf::Partition256{ x: [0.0f64; 257] },
         yinf: [0.0f64; 256],
         ysup: [0.0f64; 256],
     };

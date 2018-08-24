@@ -1,10 +1,8 @@
 extern crate rand;
 
 // Re-exports.
-pub use num_traits::Float;
+pub use num_traits::{Float, Int};
 pub use tables::*;
-
-use num_traits::Int;
 
 // External traits.
 use rand::{Rng, RngCore};
@@ -13,7 +11,7 @@ use std::marker::PhantomData;
 // Modules.
 mod num_traits;
 mod tables;
-mod util;
+pub mod util;
 
 /// Marker trait for distribution shape.
 pub trait Shape<T: Float>: Copy + Clone {
@@ -66,13 +64,11 @@ where
     let mut data = Vec::with_capacity(n + 1);
 
     // Convenient aliases.
-    let x = table.x();
-    let yinf = table.yinf();
-    let ysup = table.ysup();
-
+    let partition = table.partition();
+    
     // Compute the final table.
     for i in 0..n {
-        let yratio = yinf[i] / ysup[i];
+        let yratio = table.yinf(i) / table.ysup(i);
         let scaled_yratio = if yratio >= one_half {
             // Use baseline algorithm.
             (yratio * T::cast_gen_int(tail_switch)).round_as_gen_int()
@@ -86,13 +82,13 @@ where
         };
         // ysup is scaled such that, once multiplied by an integer random number less that
         // the tail sampling threshold, its value will be in [0:ysup].
-        let scaled_ysup = ysup[i] / T::cast_gen_int(tail_switch);
+        let scaled_ysup = table.ysup(i) / T::cast_gen_int(tail_switch);
         // dx is scaled such that, once multiplied by a random number less than the
         // critical wedge sampling threshold, its value will be in [0:dx].
-        let scaled_dx = (x[i + 1] - x[i]) / T::cast_gen_int(scaled_yratio);
+        let scaled_dx = partition.dx(i) / T::cast_gen_int(scaled_yratio);
 
         data.push(Datum {
-            x: x[i] - shape.origin(),
+            x: partition.x(i) - shape.origin(),
             scaled_dx: scaled_dx,
             scaled_ysup: scaled_ysup,
             scaled_yratio: scaled_yratio,
@@ -101,7 +97,7 @@ where
 
     // Last datum is dummy except for the x value.
     data.push(Datum {
-        x: x[n] - shape.origin(),
+        x: partition.x(n) - shape.origin(),
         scaled_dx: T::ZERO,
         scaled_ysup: T::ZERO,
         scaled_yratio: T::GenInt::ZERO,
@@ -119,12 +115,11 @@ where
     let max_switch = T::GenInt::ONE << (T::GenInt::BITS - A::Size::BITS - sign_bits);
 
     // Convenient aliases.
-    let x = table.x();
-    let ysup = table.ysup();
-
+    let partition = table.partition();
+    
     let mut area = T::ZERO;
     for i in 0..n {
-        area = area + (x[i + 1] - x[i]) * ysup[i];
+        area = area + partition.dx(i) * table.ysup(i);
     }
     let switch = T::cast_gen_int(max_switch) * (area / (area + tail_area));
 

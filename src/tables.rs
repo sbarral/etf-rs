@@ -5,17 +5,32 @@ pub trait TableSize: Copy + Clone {
     const BITS: u32;
 }
 
-/// Partition table trait.
-pub trait Table<T: Float>: Copy + Clone {
-    type Size: TableSize;
-
-    fn x(&self) -> &[T];
-    fn yinf(&self) -> &[T];
-    fn ysup(&self) -> &[T];
+/// Partition trait.
+pub trait Partition<T: Float>: Copy + Clone + Default {
+    fn x(&self, i: usize) -> T;
+    fn set_x(&mut self, i: usize, x: T);
+    fn dx(&self, i: usize) -> T {
+        self.x(i+1) - self.x(i)
+    }
+    /// Number of sub-intervals.
+    fn n(&self) -> usize;
 }
 
-macro_rules! generate_table {
-    ($s:expr, $t:ident, $ts:ident) => {
+/// Quadrature table trait.
+pub trait Table<T: Float>: Copy + Clone + Default {
+    type Size: TableSize;
+    type Partition: Partition<T>;
+
+    fn partition(&self) -> &Self::Partition;
+    fn partition_mut(&mut self) -> &mut Self::Partition;
+    fn yinf(&self, i: usize) -> T;
+    fn ysup(&self, i: usize) -> T;
+    fn set_yinf(&mut self, i: usize, yinf: T);
+    fn set_ysup(&mut self, i: usize, ysup: T);
+}
+
+macro_rules! generate_tables {
+    ($s:expr, $ts:ident, $p: ident, $t:ident) => {
         /// Table size marker.
         #[derive(Copy, Clone)]
         pub struct $ts;
@@ -24,39 +39,83 @@ macro_rules! generate_table {
             const BITS: u32 = $s;
         }
 
-        /// Partition table.
+        /// Partition.
+        #[derive(Copy, Clone)]
+        pub struct $p<T: Float> {
+            pub x: [T; (1 << $s) + 1],
+        }
+
+        impl<T: Float> Default for $p<T> {
+            fn default() -> Self {
+                Self{ x: [T::ZERO; (1 << $s) + 1] }
+            }
+        }
+        
+        impl<T: Float> Partition<T> for $p<T> {
+            fn x(&self, i: usize) -> T {
+                self.x[i]
+            }
+            fn set_x(&mut self, i: usize, x: T) {
+                self.x[i] = x;
+            }
+            fn n(&self) -> usize {
+                self.x.len() - 1
+            }
+        }
+
+        /// Quadrature table.
         #[derive(Copy, Clone)]
         pub struct $t<T: Float> {
-            pub x: [T; (1 << $s) + 1],
+            pub partition: $p<T>,
             pub yinf: [T; 1 << $s],
             pub ysup: [T; 1 << $s],
         }
 
+        impl<T: Float> Default for $t<T> {
+            fn default() -> Self {
+                Self{
+                    partition: $p::default(),
+                    yinf: [T::ZERO; 1 << $s],
+                    ysup: [T::ZERO; 1 << $s],
+                }
+            }
+        }
+
         impl<T: Float> Table<T> for $t<T> {
             type Size = $ts;
+            type Partition = $p<T>;
 
-            fn x(&self) -> &[T] {
-                &self.x
+            fn partition(&self) -> &Self::Partition {
+                &self.partition
             }
-            fn yinf(&self) -> &[T] {
-                &self.yinf
+            fn partition_mut(&mut self) -> &mut Self::Partition {
+                &mut self.partition
             }
-            fn ysup(&self) -> &[T] {
-                &self.ysup
+            fn yinf(&self, i: usize) -> T {
+                self.yinf[i]
+            }
+            fn ysup(&self, i: usize) -> T {
+                self.ysup[i]
+            }
+            fn set_yinf(&mut self, i: usize, yinf: T) {
+                self.yinf[i] = yinf;
+            }
+            fn set_ysup(&mut self, i: usize, ysup: T) {
+                self.ysup[i] = ysup;
             }
         }
     };
 }
 
-generate_table!(4, Table16, TableSize16);
-generate_table!(5, Table32, TableSize32);
-generate_table!(6, Table64, TableSize64);
-generate_table!(7, Table128, TableSize128);
-generate_table!(8, Table256, TableSize256);
-generate_table!(9, Table512, TableSize512);
-generate_table!(10, Table1024, TableSize1024);
-generate_table!(11, Table2048, TableSize2048);
-generate_table!(12, Table4096, TableSize4096);
+generate_tables!(4, TableSize16, Partition16, Table16);
+generate_tables!(5, TableSize32, Partition32, Table32);
+generate_tables!(6, TableSize64, Partition64, Table64);
+generate_tables!(7, TableSize128, Partition128, Table128);
+generate_tables!(8, TableSize256, Partition256, Table256);
+generate_tables!(9, TableSize512, Partition512, Table512);
+generate_tables!(10, TableSize1024, Partition1024, Table1024);
+generate_tables!(11, TableSize2048, Partition2048, Table2048);
+generate_tables!(12, TableSize4096, Partition4096, Table4096);
 
 /// Valid table size marker trait.
 pub trait ValidTableSize<T: Float>: TableSize {}

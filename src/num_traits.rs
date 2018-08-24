@@ -10,7 +10,8 @@ pub trait Int:
     + Shl<u32, Output = Self>
     + Shr<u32, Output = Self>
     + BitAnd<Output = Self>
-    + PartialOrd {
+    + PartialOrd
+    + Default {
     #[doc(hidden)]
     const BITS: u32;
     #[doc(hidden)]
@@ -72,6 +73,7 @@ pub trait Float:
     + Mul<Output = Self>
     + Div<Output = Self>
     + PartialOrd
+    + Default
 {
     #[doc(hidden)]
     const SIGNIFICAND_BITS: u32;
@@ -87,6 +89,9 @@ pub trait Float:
 
     #[doc(hidden)]
     fn gen<R: Rng + ?Sized>(rng: &mut R) -> Self;
+
+    #[doc(hidden)]
+    fn cast_usize(u: usize) -> Self;
 
     #[doc(hidden)]
     fn cast_gen_int(u: Self::GenInt) -> Self;
@@ -111,6 +116,10 @@ impl Float for f32 {
     #[doc(hidden)]
     fn gen<R: Rng + ?Sized>(rng: &mut R) -> Self {
         rng.gen()
+    }
+    #[doc(hidden)]
+    fn cast_usize(u: usize) -> Self {
+        u as Self
     }
     #[doc(hidden)]
     fn cast_gen_int(u: Self::GenInt) -> Self {
@@ -138,6 +147,10 @@ impl Float for f64 {
     #[doc(hidden)]
     fn gen<R: Rng + ?Sized>(rng: &mut R) -> Self {
         rng.gen()
+    }
+    #[doc(hidden)]
+    fn cast_usize(u: usize) -> Self {
+        u as Self
     }
     #[doc(hidden)]
     fn cast_gen_int(u: Self::GenInt) -> Self {
