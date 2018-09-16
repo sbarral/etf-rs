@@ -1,5 +1,6 @@
 use rand::Rng;
-use std::ops::{Add, Sub, Div, Mul, Shl, Shr, BitAnd};
+use std;
+use std::ops::{Add, AddAssign, Sub, Div, Mul, Shl, Shr, BitAnd};
 use std::cmp::PartialOrd;
 
 /// Unsigned integer traits.
@@ -72,6 +73,7 @@ pub trait Float:
     + Sub<Output = Self>
     + Mul<Output = Self>
     + Div<Output = Self>
+    + AddAssign
     + PartialOrd
     + Default
 {
@@ -83,6 +85,8 @@ pub trait Float:
     const ONE: Self;
     #[doc(hidden)]
     const MINUS_ONE: Self;
+    #[doc(hidden)]
+    const INFINITY: Self;
 
     #[doc(hidden)]
     type GenInt: Int; // Unsigned integer used for float generation
@@ -98,6 +102,15 @@ pub trait Float:
 
     #[doc(hidden)]
     fn round_as_gen_int(self) -> Self::GenInt;
+
+    #[doc(hidden)]
+    fn min(self, other: Self) -> Self;
+
+    #[doc(hidden)]
+    fn max(self, other: Self) -> Self;
+
+    #[doc(hidden)]
+    fn abs(self) -> Self;
 }
 
 impl Float for f32 {
@@ -109,6 +122,8 @@ impl Float for f32 {
     const ONE: Self = 1f32;
     #[doc(hidden)]
     const MINUS_ONE: Self = -1f32;
+    #[doc(hidden)]
+    const INFINITY: Self = std::f32::INFINITY;
 
     #[doc(hidden)]
     type GenInt = u32;
@@ -129,6 +144,21 @@ impl Float for f32 {
     fn round_as_gen_int(self) -> Self::GenInt {
         self.round() as Self::GenInt
     }
+
+    #[doc(hidden)]
+    fn min(self, other: Self) -> Self {
+        self.min(other)
+    }
+
+    #[doc(hidden)]
+    fn max(self, other: Self) -> Self {
+        self.max(other)
+    }
+
+    #[doc(hidden)]
+    fn abs(self) -> Self {
+        self.abs()
+    }
 }
 
 impl Float for f64 {
@@ -140,6 +170,8 @@ impl Float for f64 {
     const ONE: Self = 1f64;
     #[doc(hidden)]
     const MINUS_ONE: Self = -1f64;
+    #[doc(hidden)]
+    const INFINITY: Self = std::f64::INFINITY;
 
     #[doc(hidden)]
     type GenInt = u64;
@@ -160,4 +192,20 @@ impl Float for f64 {
     fn round_as_gen_int(self) -> Self::GenInt {
         self.round() as Self::GenInt
     }
+
+    #[doc(hidden)]
+    fn min(self, other: Self) -> Self {
+        self.min(other)
+    }
+
+    #[doc(hidden)]
+    fn max(self, other: Self) -> Self {
+        self.max(other)
+    }
+
+    #[doc(hidden)]
+    fn abs(self) -> Self {
+        self.abs()
+    }
+
 }
