@@ -1,6 +1,6 @@
 use num::Float;
 
-use rand::RngCore;
+use rand_core::RngCore;
 
 /// Distribution tail trait.
 pub trait Tail<T: Float> {

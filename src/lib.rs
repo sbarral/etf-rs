@@ -1,4 +1,4 @@
-extern crate rand;
+extern crate rand_core;
 
 // Internal traits.
 use num::{Float, Int};
@@ -6,7 +6,7 @@ use table::{Table, TableSize, ValidTableSize, ValidSymmetricTableSize};
 use tail::*;
 
 // External traits.
-use rand::{Rng, RngCore};
+use rand_core::RngCore;
 use std::marker::PhantomData;
 
 // Modules.
@@ -164,7 +164,7 @@ where
     N: TableSize,
     G: Tail<T>,
 {
-    pub fn sample<R: Rng>(&self, rng: &mut R) -> T {
+    pub fn sample<R: RngCore>(&self, rng: &mut R) -> T {
         loop {
             let r = T::GenInt::gen(rng);
 
@@ -186,6 +186,8 @@ where
                 if u >= switch {
                     if let Some(x) = self.tail.sample(rng) {
                         return x;
+                    } else {
+                        continue;
                     }
                 }
             }
@@ -193,7 +195,7 @@ where
             // Wedge sampling, test y<f(x).
             let x0 = d.x;
             let x1 = self.data[i.as_usize() + 1].x;
-            let x = x0 + T::gen(rng) * (x1 - x0);
+            let x = x0 + (T::cast_gen_int(T::GenInt::gen(rng))*T::INV_MAX_GEN_INT) * (x1 - x0);
             if T::cast_gen_int(u) * d.scaled_ysup < (self.func)(x) {
                 return x;
             }
@@ -269,7 +271,7 @@ where
     N: TableSize,
     G: Tail<T>,
 {
-    pub fn sample<R: Rng>(&self, rng: &mut R) -> T {
+    pub fn sample<R: RngCore>(&self, rng: &mut R) -> T {
         loop {
             let r = T::GenInt::gen(rng);
 
@@ -299,6 +301,8 @@ where
                 if u >= switch {
                     if let Some(x) = self.tail.sample(rng) {
                         return s * x;
+                    } else {
+                        continue;
                     }
                 }
             }
@@ -306,7 +310,7 @@ where
             // Wedge sampling, test y<f(x).
             let x0 = d.x;
             let x1 = self.data[i.as_usize() + 1].x;
-            let x = x0 + T::gen(rng) * (x1 - x0);
+            let x = x0 + (T::cast_gen_int(T::GenInt::gen(rng))*T::INV_MAX_GEN_INT) * (x1 - x0);
             if T::cast_gen_int(u) * d.scaled_ysup < (self.func)(x) {
                 return s * x;
             }
@@ -385,7 +389,7 @@ where
     N: TableSize,
     G: Tail<T>,
 {
-    pub fn sample<R: Rng>(&self, rng: &mut R) -> T {
+    pub fn sample<R: RngCore>(&self, rng: &mut R) -> T {
         loop {
             let r = T::GenInt::gen(rng);
 
@@ -415,6 +419,8 @@ where
                 if u >= switch {
                     if let Some(x) = self.tail.sample(rng) {
                         return self.x0 + s * (x - self.x0);
+                    } else {
+                        continue;
                     }
                 }
             }
@@ -422,7 +428,7 @@ where
             // Wedge sampling, test y<f(x).
             let x0 = d.x;
             let x1 = self.data[i.as_usize() + 1].x;
-            let x = x0 + T::gen(rng) * (x1 - x0); // here x is relative to the origin
+            let x = x0 + (T::cast_gen_int(T::GenInt::gen(rng))*T::INV_MAX_GEN_INT) * (x1 - x0); // here x is relative to the origin
             if T::cast_gen_int(u) * d.scaled_ysup < (self.func)(x + self.x0) {
                 return self.x0 + s * x;
             }

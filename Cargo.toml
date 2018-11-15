@@ -4,4 +4,4 @@ version = "0.1.0"
 authors = ["Serge Barral <sbarral@quintescience.com>"]
 
 [dependencies]
-rand = "0.5"
+rand_core = "0.3"

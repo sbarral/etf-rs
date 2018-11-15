@@ -1,4 +1,4 @@
-use rand::Rng;
+use rand_core::RngCore;
 use std;
 use std::ops::{Add, AddAssign, Sub, Div, Mul, Shl, Shr, BitAnd};
 use std::cmp::PartialOrd;
@@ -21,7 +21,7 @@ pub trait Int:
     const ONE: Self;
 
     #[doc(hidden)]
-    fn gen<R: Rng + ?Sized>(rng: &mut R) -> Self;
+    fn gen<R: RngCore + ?Sized>(rng: &mut R) -> Self;
 
     #[doc(hidden)]
     fn as_usize(self) -> usize;
@@ -36,8 +36,8 @@ impl Int for u32 {
     const ONE: Self = 1u32;
 
     #[doc(hidden)]
-    fn gen<R: Rng + ?Sized>(rng: &mut R) -> Self {
-        rng.gen()
+    fn gen<R: RngCore + ?Sized>(rng: &mut R) -> Self {
+        rng.next_u32()
     }
 
     #[doc(hidden)]
@@ -55,8 +55,8 @@ impl Int for u64 {
     const ONE: Self = 1u64;
 
     #[doc(hidden)]
-    fn gen<R: Rng + ?Sized>(rng: &mut R) -> Self {
-        rng.gen()
+    fn gen<R: RngCore + ?Sized>(rng: &mut R) -> Self {
+        rng.next_u64()
     }
 
     #[doc(hidden)]
@@ -87,12 +87,11 @@ pub trait Float:
     const MINUS_ONE: Self;
     #[doc(hidden)]
     const INFINITY: Self;
+    #[doc(hidden)]
+    const INV_MAX_GEN_INT: Self;
 
     #[doc(hidden)]
     type GenInt: Int; // Unsigned integer used for float generation
-
-    #[doc(hidden)]
-    fn gen<R: Rng + ?Sized>(rng: &mut R) -> Self;
 
     #[doc(hidden)]
     fn cast_usize(u: usize) -> Self;
@@ -124,14 +123,12 @@ impl Float for f32 {
     const MINUS_ONE: Self = -1f32;
     #[doc(hidden)]
     const INFINITY: Self = std::f32::INFINITY;
+    #[doc(hidden)]
+    const INV_MAX_GEN_INT: Self = 1f32/(1f32 + std::u32::MAX as f32);
 
     #[doc(hidden)]
     type GenInt = u32;
 
-    #[doc(hidden)]
-    fn gen<R: Rng + ?Sized>(rng: &mut R) -> Self {
-        rng.gen()
-    }
     #[doc(hidden)]
     fn cast_usize(u: usize) -> Self {
         u as Self
@@ -172,14 +169,12 @@ impl Float for f64 {
     const MINUS_ONE: Self = -1f64;
     #[doc(hidden)]
     const INFINITY: Self = std::f64::INFINITY;
+    #[doc(hidden)]
+    const INV_MAX_GEN_INT: Self = 1f64/(1f64 + std::u64::MAX as f64);
 
     #[doc(hidden)]
     type GenInt = u64;
 
-    #[doc(hidden)]
-    fn gen<R: Rng + ?Sized>(rng: &mut R) -> Self {
-        rng.gen()
-    }
     #[doc(hidden)]
     fn cast_usize(u: usize) -> Self {
         u as Self
