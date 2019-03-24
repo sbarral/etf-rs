@@ -1,5 +1,5 @@
-use num::Float;
-use table::{Partition, Table};
+use crate::num::Float;
+use crate::table::{Partition, Table};
 
 use std::cmp;
 

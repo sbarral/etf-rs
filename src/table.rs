@@ -1,4 +1,4 @@
-use num::Float;
+use crate::num::Float;
 
 /// Marker trait for table size.
 pub trait TableSize: Copy + Clone {
