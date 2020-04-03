@@ -5,14 +5,6 @@ pub trait TableSize: Copy + Clone {
     const BITS: u32;
 }
 
-/// Partition trait.
-pub trait Partition<T: Float>: Copy + Clone + Default {
-    /// Slice view.
-    fn as_slice(&self) -> &[T];
-    /// Mutable slice view.
-    fn as_mut_slice(&mut self) -> &mut [T];
-}
-
 /// Quadrature table view.
 pub struct TableView<'a, T: Float + 'a> {
     pub x: &'a [T],
@@ -30,7 +22,7 @@ pub struct TableMutView<'a, T: Float + 'a> {
 /// Quadrature table trait.
 pub trait Table<T: Float>: Copy + Clone + Default {
     type Size: TableSize;
-    type Partition: Partition<T>;
+    type Partition: AsRef<[T]> + AsMut<[T]> + Default;
 
     fn as_view(&self) -> TableView<T>;
     fn as_mut_view(&mut self) -> TableMutView<T>;
@@ -48,7 +40,7 @@ macro_rules! generate_tables {
 
         #[derive(Copy, Clone)]
         pub struct $p<T: Float> {
-            x: [T; (1 << $s) + 1],
+            pub x: [T; (1 << $s) + 1],
         }
 
         impl<T: Float> Default for $p<T> {
@@ -59,11 +51,14 @@ macro_rules! generate_tables {
             }
         }
 
-        impl<T: Float> Partition<T> for $p<T> {
-            fn as_slice(&self) -> &[T] {
+        impl<T: Float> AsRef<[T]> for $p<T> {
+            fn as_ref(&self) -> &[T] {
                 &self.x
             }
-            fn as_mut_slice(&mut self) -> &mut [T] {
+        }
+
+        impl<T: Float> AsMut<[T]> for $p<T> {
+            fn as_mut(&mut self) -> &mut [T] {
                 &mut self.x
             }
         }
