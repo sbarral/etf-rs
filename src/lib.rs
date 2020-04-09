@@ -1,15 +1,17 @@
 // Internal traits.
-use num::*;
-use table::*;
+pub use num::*;
+use partition::*;
+pub use table_validation::*;
 
 // External traits.
-use rand::distributions::Distribution;
+pub use rand::distributions::Distribution;
 use rand::{Rng, RngCore};
 use std::marker::PhantomData;
 
 // Modules.
-pub mod num;
-pub mod table;
+mod num;
+pub mod partition;
+mod table_validation;
 pub mod util;
 
 /// Tail sampling envelope distribution.
@@ -19,25 +21,22 @@ pub trait Envelope<T> {
     fn try_sample<R: Rng + ?Sized>(&self, rng: &mut R) -> Option<T>;
 }
 
-/// Distribution with arbitrarily-shaped PDF.
+/// Distribution with arbitrarily-shaped probability density function and bounded support.
 #[derive(Clone)]
-pub struct DistAny<T: Float, F, N> {
+pub struct DistAny<P, T: Float, F> {
     data: Vec<Datum<T>>,
     func: F,
-    phantom_table_size: PhantomData<N>,
+    phantom_table_size: PhantomData<P>,
 }
 
-impl<T, F, N> DistAny<T, F, N>
+impl<P, T, F> DistAny<P, T, F>
 where
+    P: ValidPartitionSize<T>,
     T: Float,
     F: Fn(T) -> T,
-    N: ValidTableSize<T>,
 {
-    pub fn new<A>(func: F, table: &A) -> Self
-    where
-        A: Table<T, Size = N>,
-    {
-        let tail_switch = T::GenInt::ONE << (T::GenInt::BITS - A::Size::BITS);
+    pub fn new(func: F, table: &InitTable<P, T>) -> Self {
+        let tail_switch = T::GenInt::ONE << (T::GenInt::BITS - P::BITS);
 
         DistAny {
             data: process_table(T::ZERO, table, tail_switch),
@@ -47,32 +46,33 @@ where
     }
 }
 
-impl<T, F, N> Distribution<T> for DistAny<T, F, N>
+impl<P, T, F> Distribution<T> for DistAny<P, T, F>
 where
+    P: Partition,
     T: Float,
     F: Fn(T) -> T,
-    N: TableSize,
 {
     fn sample<R: RngCore + ?Sized>(&self, rng: &mut R) -> T {
         loop {
             let r = T::GenInt::gen(rng);
 
             // Extract the significand from the leftmost bits after the table index.
-            let u_mask = (T::GenInt::ONE << (T::GenInt::BITS - N::BITS)) - T::GenInt::ONE;
+            let u_mask = (T::GenInt::ONE << (T::GenInt::BITS - P::BITS)) - T::GenInt::ONE;
             let u = r & u_mask;
 
             // Extract the table index from the leftmost bits.
-            let i = r >> (T::GenInt::BITS - N::BITS);
+            let i = r >> (T::GenInt::BITS - P::BITS);
 
             // Test for the common case (point below yinf).
-            let d = &self.data[i.as_usize()];
+            let i: usize = i.as_usize();
+            let d = &self.data[i];
             if u < d.scaled_yratio {
                 return d.x + d.scaled_dx * T::cast_gen_int(u);
             }
 
             // Wedge sampling, test y<f(x).
             let x0 = d.x;
-            let x1 = self.data[i.as_usize() + 1].x;
+            let x1 = self.data[i + 1].x;
             let x = x0 + T::gen(rng) * (x1 - x0);
             if T::cast_gen_int(u) * d.scaled_ysup < (self.func)(x) {
                 return x;
@@ -81,27 +81,24 @@ where
     }
 }
 
-/// Distribution with arbitrarily-shaped PDF and rejection-sampled tail.
+/// Distribution with arbitrarily-shaped probability density function and rejection-sampled tail.
 #[derive(Clone)]
-pub struct DistAnyTailed<T: Float, F, N, E> {
+pub struct DistAnyTailed<P, T: Float, F, E> {
     data: Vec<Datum<T>>,
     func: F,
     tail_envelope: E,
     tail_switch: T::GenInt,
-    phantom_table_size: PhantomData<N>,
+    phantom_table_size: PhantomData<P>,
 }
 
-impl<T, F, N, E> DistAnyTailed<T, F, N, E>
+impl<P, T, F, E> DistAnyTailed<P, T, F, E>
 where
+    P: ValidPartitionSize<T>,
     T: Float,
     F: Fn(T) -> T,
-    N: ValidTableSize<T>,
     E: Envelope<T>,
 {
-    pub fn new<A>(func: F, table: &A, tail_envelope: E, tail_area: T) -> Self
-    where
-        A: Table<T, Size = N>,
-    {
+    pub fn new(func: F, table: &InitTable<P, T>, tail_envelope: E, tail_area: T) -> Self {
         let tail_switch = compute_tail_switch(table, tail_area, 0);
 
         DistAnyTailed {
@@ -114,11 +111,11 @@ where
     }
 }
 
-impl<T, F, N, E> Distribution<T> for DistAnyTailed<T, F, N, E>
+impl<P, T, F, E> Distribution<T> for DistAnyTailed<P, T, F, E>
 where
+    P: Partition,
     T: Float,
     F: Fn(T) -> T,
-    N: TableSize,
     E: Envelope<T>,
 {
     fn sample<R: Rng + ?Sized>(&self, rng: &mut R) -> T {
@@ -126,14 +123,15 @@ where
             let r = T::GenInt::gen(rng);
 
             // Extract the significand from the leftmost bits after the table index.
-            let u_mask = (T::GenInt::ONE << (T::GenInt::BITS - N::BITS)) - T::GenInt::ONE;
+            let u_mask = (T::GenInt::ONE << (T::GenInt::BITS - P::BITS)) - T::GenInt::ONE;
             let u = r & u_mask;
 
             // Extract the table index from the leftmost bits.
-            let i = r >> (T::GenInt::BITS - N::BITS);
+            let i = r >> (T::GenInt::BITS - P::BITS);
 
             // Test for the common case (point below yinf).
-            let d = &self.data[i.as_usize()];
+            let i = i.as_usize();
+            let d = &self.data[i];
             if u < d.scaled_yratio {
                 return d.x + d.scaled_dx * T::cast_gen_int(u);
             }
@@ -148,7 +146,7 @@ where
 
             // Wedge sampling, test y<f(x).
             let x0 = d.x;
-            let x1 = self.data[i.as_usize() + 1].x;
+            let x1 = self.data[i + 1].x;
             let x = x0 + T::gen(rng) * (x1 - x0);
             if T::cast_gen_int(u) * d.scaled_ysup < (self.func)(x) {
                 return x;
@@ -157,25 +155,22 @@ where
     }
 }
 
-/// Distribution with symmetric PDF about the origin.
+/// Distribution with symmetric probability density function about the origin and bounded support.
 #[derive(Clone)]
-pub struct DistCentral<T: Float, F, N> {
+pub struct DistCentral<P, T: Float, F> {
     data: Vec<Datum<T>>,
     func: F,
-    phantom_table_size: PhantomData<N>,
+    phantom_table_size: PhantomData<P>,
 }
 
-impl<T, F, N> DistCentral<T, F, N>
+impl<P, T, F> DistCentral<P, T, F>
 where
+    P: ValidSymmetricPartitionSize<T>,
     T: Float,
     F: Fn(T) -> T,
-    N: ValidSymmetricTableSize<T>,
 {
-    pub fn new<A>(func: F, table: &A) -> Self
-    where
-        A: Table<T, Size = N>,
-    {
-        let tail_switch = T::GenInt::ONE << (T::GenInt::BITS - A::Size::BITS - 1);
+    pub fn new(func: F, table: &InitTable<P, T>) -> Self {
+        let tail_switch = T::GenInt::ONE << (T::GenInt::BITS - P::BITS - 1);
 
         DistCentral {
             data: process_table(T::ZERO, table, tail_switch),
@@ -185,23 +180,23 @@ where
     }
 }
 
-impl<T, F, N> Distribution<T> for DistCentral<T, F, N>
+impl<P, T, F> Distribution<T> for DistCentral<P, T, F>
 where
+    P: Partition,
     T: Float,
     F: Fn(T) -> T,
-    N: TableSize,
 {
     fn sample<R: Rng + ?Sized>(&self, rng: &mut R) -> T {
         loop {
             let r = T::GenInt::gen(rng);
 
             // Extract the significand from the leftmost bits after the table index.
-            let u_mask = (T::GenInt::ONE << (T::GenInt::BITS - N::BITS - 1)) - T::GenInt::ONE;
+            let u_mask = (T::GenInt::ONE << (T::GenInt::BITS - P::BITS - 1)) - T::GenInt::ONE;
             let u = r & u_mask;
 
-            // Extract the table index from the N leftmost bits after the sign bit.
-            let i_mask = (T::GenInt::ONE << N::BITS) - T::GenInt::ONE;
-            let i = (r >> (T::GenInt::BITS - N::BITS - 1)) & i_mask;
+            // Extract the table index from the P leftmost bits after the sign bit.
+            let i_mask = (T::GenInt::ONE << P::BITS) - T::GenInt::ONE;
+            let i = (r >> (T::GenInt::BITS - P::BITS - 1)) & i_mask;
 
             // Extract the sign from the leftmost bit.
             let s = if (r >> (T::GenInt::BITS - 1)) != T::GenInt::ZERO {
@@ -211,14 +206,15 @@ where
             };
 
             // Test for the common case (point below yinf).
-            let d = &self.data[i.as_usize()];
+            let i = i.as_usize();
+            let d = &self.data[i];
             if u < d.scaled_yratio {
                 return s * (d.x + d.scaled_dx * T::cast_gen_int(u));
             }
 
             // Wedge sampling, test y<f(x).
             let x0 = d.x;
-            let x1 = self.data[i.as_usize() + 1].x;
+            let x1 = self.data[i + 1].x;
             let x = x0 + T::gen(rng) * (x1 - x0); // here x is relative to the origin
             if T::cast_gen_int(u) * d.scaled_ysup < (self.func)(x) {
                 return s * x;
@@ -227,27 +223,24 @@ where
     }
 }
 
-/// Distribution with symmetric PDF about the origin and rejection-sampled tail.
+/// Distribution with symmetric probability density function about the origin and rejection-sampled tail.
 #[derive(Clone)]
-pub struct DistCentralTailed<T: Float, F, N, E> {
+pub struct DistCentralTailed<P, T: Float, F, E> {
     data: Vec<Datum<T>>,
     func: F,
     tail_envelope: E,
     tail_switch: T::GenInt,
-    phantom_table_size: PhantomData<N>,
+    phantom_table_size: PhantomData<P>,
 }
 
-impl<T, F, N, E> DistCentralTailed<T, F, N, E>
+impl<P, T, F, E> DistCentralTailed<P, T, F, E>
 where
+    P: ValidSymmetricPartitionSize<T>,
     T: Float,
     F: Fn(T) -> T,
-    N: ValidSymmetricTableSize<T>,
     E: Envelope<T>,
 {
-    pub fn new<A>(func: F, table: &A, tail_envelope: E, tail_area: T) -> Self
-    where
-        A: Table<T, Size = N>,
-    {
+    pub fn new(func: F, table: &InitTable<P, T>, tail_envelope: E, tail_area: T) -> Self {
         let tail_switch = compute_tail_switch(table, tail_area, 1);
 
         DistCentralTailed {
@@ -260,11 +253,11 @@ where
     }
 }
 
-impl<T, F, N, E> Distribution<T> for DistCentralTailed<T, F, N, E>
+impl<P, T, F, E> Distribution<T> for DistCentralTailed<P, T, F, E>
 where
+    P: Partition,
     T: Float,
     F: Fn(T) -> T,
-    N: TableSize,
     E: Envelope<T>,
 {
     fn sample<R: Rng + ?Sized>(&self, rng: &mut R) -> T {
@@ -272,12 +265,12 @@ where
             let r = T::GenInt::gen(rng);
 
             // Extract the significand from the leftmost bits after the table index.
-            let u_mask = (T::GenInt::ONE << (T::GenInt::BITS - N::BITS - 1)) - T::GenInt::ONE;
+            let u_mask = (T::GenInt::ONE << (T::GenInt::BITS - P::BITS - 1)) - T::GenInt::ONE;
             let u = r & u_mask;
 
-            // Extract the table index from the N leftmost bits after the sign bit.
-            let i_mask = (T::GenInt::ONE << N::BITS) - T::GenInt::ONE;
-            let i = (r >> (T::GenInt::BITS - N::BITS - 1)) & i_mask;
+            // Extract the table index from the P leftmost bits after the sign bit.
+            let i_mask = (T::GenInt::ONE << P::BITS) - T::GenInt::ONE;
+            let i = (r >> (T::GenInt::BITS - P::BITS - 1)) & i_mask;
 
             // Extract the sign from the leftmost bit.
             let s = if (r >> (T::GenInt::BITS - 1)) != T::GenInt::ZERO {
@@ -287,7 +280,8 @@ where
             };
 
             // Test for the common case (point below yinf).
-            let d = &self.data[i.as_usize()];
+            let i = i.as_usize();
+            let d = &self.data[i];
             if u < d.scaled_yratio {
                 return s * (d.x + d.scaled_dx * T::cast_gen_int(u));
             }
@@ -302,7 +296,7 @@ where
 
             // Wedge sampling, test y<f(x).
             let x0 = d.x;
-            let x1 = self.data[i.as_usize() + 1].x;
+            let x1 = self.data[i + 1].x;
             let x = x0 + T::gen(rng) * (x1 - x0); // here x is relative to the origin
             if T::cast_gen_int(u) * d.scaled_ysup < (self.func)(x) {
                 return s * x;
@@ -311,26 +305,23 @@ where
     }
 }
 
-/// Distribution with symmetric PDF.
+/// Distribution with symmetric probability density function and bounded support.
 #[derive(Clone)]
-pub struct DistSymmetric<T: Float, F, N> {
+pub struct DistSymmetric<P, T: Float, F> {
     data: Vec<Datum<T>>,
     func: F,
     x0: T,
-    phantom_table_size: PhantomData<N>,
+    phantom_table_size: PhantomData<P>,
 }
 
-impl<T, F, N> DistSymmetric<T, F, N>
+impl<P, T, F> DistSymmetric<P, T, F>
 where
+    P: ValidSymmetricPartitionSize<T>,
     T: Float,
     F: Fn(T) -> T,
-    N: ValidSymmetricTableSize<T>,
 {
-    pub fn new<A>(x0: T, func: F, table: &A) -> Self
-    where
-        A: Table<T, Size = N>,
-    {
-        let tail_switch = T::GenInt::ONE << (T::GenInt::BITS - A::Size::BITS - 1);
+    pub fn new(x0: T, func: F, table: &InitTable<P, T>) -> Self {
+        let tail_switch = T::GenInt::ONE << (T::GenInt::BITS - P::BITS - 1);
 
         DistSymmetric {
             data: process_table(x0, table, tail_switch),
@@ -341,23 +332,23 @@ where
     }
 }
 
-impl<T, F, N> Distribution<T> for DistSymmetric<T, F, N>
+impl<P, T, F> Distribution<T> for DistSymmetric<P, T, F>
 where
+    P: Partition,
     T: Float,
     F: Fn(T) -> T,
-    N: TableSize,
 {
     fn sample<R: Rng + ?Sized>(&self, rng: &mut R) -> T {
         loop {
             let r = T::GenInt::gen(rng);
 
             // Extract the significand from the leftmost bits after the table index.
-            let u_mask = (T::GenInt::ONE << (T::GenInt::BITS - N::BITS - 1)) - T::GenInt::ONE;
+            let u_mask = (T::GenInt::ONE << (T::GenInt::BITS - P::BITS - 1)) - T::GenInt::ONE;
             let u = r & u_mask;
 
-            // Extract the table index from the N leftmost bits after the sign bit.
-            let i_mask = (T::GenInt::ONE << N::BITS) - T::GenInt::ONE;
-            let i = (r >> (T::GenInt::BITS - N::BITS - 1)) & i_mask;
+            // Extract the table index from the P leftmost bits after the sign bit.
+            let i_mask = (T::GenInt::ONE << P::BITS) - T::GenInt::ONE;
+            let i = (r >> (T::GenInt::BITS - P::BITS - 1)) & i_mask;
 
             // Extract the sign from the leftmost bit.
             let s = if (r >> (T::GenInt::BITS - 1)) != T::GenInt::ZERO {
@@ -367,14 +358,15 @@ where
             };
 
             // Test for the common case (point below yinf).
-            let d = &self.data[i.as_usize()];
+            let i = i.as_usize();
+            let d = &self.data[i];
             if u < d.scaled_yratio {
                 return self.x0 + s * (d.x + d.scaled_dx * T::cast_gen_int(u));
             }
 
             // Wedge sampling, test y<f(x).
             let x0 = d.x;
-            let x1 = self.data[i.as_usize() + 1].x;
+            let x1 = self.data[i + 1].x;
             let x = x0 + T::gen(rng) * (x1 - x0); // here x is relative to the origin
             if T::cast_gen_int(u) * d.scaled_ysup < (self.func)(x + self.x0) {
                 return self.x0 + s * x;
@@ -383,28 +375,25 @@ where
     }
 }
 
-/// Distribution with symmetric PDF and rejection-sampled tail.
+/// Distribution with symmetric probability density function and rejection-sampled tail.
 #[derive(Clone)]
-pub struct DistSymmetricTailed<T: Float, F, N, E> {
+pub struct DistSymmetricTailed<P, T: Float, F, E> {
     data: Vec<Datum<T>>,
     func: F,
     x0: T,
     tail_envelope: E,
     tail_switch: T::GenInt,
-    phantom_table_size: PhantomData<N>,
+    phantom_table_size: PhantomData<P>,
 }
 
-impl<T, F, N, E> DistSymmetricTailed<T, F, N, E>
+impl<P, T, F, E> DistSymmetricTailed<P, T, F, E>
 where
+    P: ValidSymmetricPartitionSize<T>,
     T: Float,
     F: Fn(T) -> T,
-    N: ValidSymmetricTableSize<T>,
     E: Envelope<T>,
 {
-    pub fn new<A>(x0: T, func: F, table: &A, tail_envelope: E, tail_area: T) -> Self
-    where
-        A: Table<T, Size = N>,
-    {
+    pub fn new(x0: T, func: F, table: &InitTable<P, T>, tail_envelope: E, tail_area: T) -> Self {
         let tail_switch = compute_tail_switch(table, tail_area, 1);
 
         DistSymmetricTailed {
@@ -418,11 +407,11 @@ where
     }
 }
 
-impl<T, F, N, E> Distribution<T> for DistSymmetricTailed<T, F, N, E>
+impl<P, T, F, E> Distribution<T> for DistSymmetricTailed<P, T, F, E>
 where
+    P: Partition,
     T: Float,
     F: Fn(T) -> T,
-    N: TableSize,
     E: Envelope<T>,
 {
     fn sample<R: Rng + ?Sized>(&self, rng: &mut R) -> T {
@@ -430,12 +419,12 @@ where
             let r = T::GenInt::gen(rng);
 
             // Extract the significand from the leftmost bits after the table index.
-            let u_mask = (T::GenInt::ONE << (T::GenInt::BITS - N::BITS - 1)) - T::GenInt::ONE;
+            let u_mask = (T::GenInt::ONE << (T::GenInt::BITS - P::BITS - 1)) - T::GenInt::ONE;
             let u = r & u_mask;
 
-            // Extract the table index from the N leftmost bits after the sign bit.
-            let i_mask = (T::GenInt::ONE << N::BITS) - T::GenInt::ONE;
-            let i = (r >> (T::GenInt::BITS - N::BITS - 1)) & i_mask;
+            // Extract the table index from the P leftmost bits after the sign bit.
+            let i_mask = (T::GenInt::ONE << P::BITS) - T::GenInt::ONE;
+            let i = (r >> (T::GenInt::BITS - P::BITS - 1)) & i_mask;
 
             // Extract the sign from the leftmost bit.
             let s = if (r >> (T::GenInt::BITS - 1)) != T::GenInt::ZERO {
@@ -445,7 +434,8 @@ where
             };
 
             // Test for the common case (point below yinf).
-            let d = &self.data[i.as_usize()];
+            let i = i.as_usize();
+            let d = &self.data[i];
             if u < d.scaled_yratio {
                 return self.x0 + s * (d.x + d.scaled_dx * T::cast_gen_int(u));
             }
@@ -460,7 +450,7 @@ where
 
             // Wedge sampling, test y<f(x).
             let x0 = d.x;
-            let x1 = self.data[i.as_usize() + 1].x;
+            let x1 = self.data[i + 1].x;
             let x = x0 + T::gen(rng) * (x1 - x0); // here x is relative to the origin
             if T::cast_gen_int(u) * d.scaled_ysup < (self.func)(x + self.x0) {
                 return self.x0 + s * x;
@@ -479,21 +469,23 @@ struct Datum<T: Float> {
 }
 
 // Generates an optimized lookup table from a quadrature table.
-fn process_table<T, A>(x0: T, table: &A, tail_switch: T::GenInt) -> Vec<Datum<T>>
+fn process_table<P, T>(x0: T, table: &InitTable<P, T>, tail_switch: T::GenInt) -> Vec<Datum<T>>
 where
+    P: Partition,
     T: Float,
-    A: Table<T>,
 {
     let one_half = T::ONE / (T::ONE + T::ONE);
-    let n: usize = 1 << A::Size::BITS;
+    let n = P::SIZE;
     let mut data = Vec::with_capacity(n + 1);
 
-    // Convenient alias.
-    let table = table.as_view();
+    // Convenient aliases.
+    let x = table.x.as_ref();
+    let yinf = table.yinf.as_ref();
+    let ysup = table.ysup.as_ref();
 
     // Compute the final table.
     for i in 0..n {
-        let yratio = table.yinf[i] / table.ysup[i];
+        let yratio = yinf[i] / ysup[i];
         let scaled_yratio = if yratio >= one_half {
             // Use baseline algorithm.
             (yratio * T::cast_gen_int(tail_switch)).round_as_gen_int()
@@ -507,13 +499,13 @@ where
         };
         // ysup is scaled such that, once multiplied by an integer random number less that
         // the tail sampling threshold, its value will be in [0:ysup].
-        let scaled_ysup = table.ysup[i] / T::cast_gen_int(tail_switch);
+        let scaled_ysup = ysup[i] / T::cast_gen_int(tail_switch);
         // dx is scaled such that, once multiplied by a random number less than the
         // critical wedge sampling threshold, its value will be in [0:dx].
-        let scaled_dx = (table.x[i + 1] - table.x[i]) / T::cast_gen_int(scaled_yratio);
+        let scaled_dx = (x[i + 1] - x[i]) / T::cast_gen_int(scaled_yratio);
 
         data.push(Datum {
-            x: table.x[i] - x0,
+            x: x[i] - x0,
             scaled_dx: scaled_dx,
             scaled_ysup: scaled_ysup,
             scaled_yratio: scaled_yratio,
@@ -522,7 +514,7 @@ where
 
     // Last datum is dummy except for the x value.
     data.push(Datum {
-        x: table.x[n] - x0,
+        x: x[n] - x0,
         scaled_dx: T::ZERO,
         scaled_ysup: T::ZERO,
         scaled_yratio: T::GenInt::ZERO,
@@ -532,18 +524,20 @@ where
 }
 
 // Computes the integer used as a threshold for tail sampling.
-fn compute_tail_switch<T, A>(table: &A, tail_area: T, sign_bits: u32) -> T::GenInt
+fn compute_tail_switch<P, T>(table: &InitTable<P, T>, tail_area: T, sign_bits: u32) -> T::GenInt
 where
+    P: Partition,
     T: Float,
-    A: Table<T>,
 {
-    let n: usize = 1 << A::Size::BITS;
-    let max_switch = T::GenInt::ONE << (T::GenInt::BITS - A::Size::BITS - sign_bits);
+    let max_switch = T::GenInt::ONE << (T::GenInt::BITS - P::BITS - sign_bits);
 
-    let table = table.as_view();
+    // Convenient aliases.
+    let x = table.x.as_ref();
+    let ysup = table.ysup.as_ref();
+
     let mut area = T::ZERO;
-    for i in 0..n {
-        area = area + (table.x[i + 1] - table.x[i]) * table.ysup[i];
+    for i in 0..P::SIZE {
+        area = area + (x[i + 1] - x[i]) * ysup[i];
     }
     let switch = T::cast_gen_int(max_switch) * (area / (area + tail_area));
 

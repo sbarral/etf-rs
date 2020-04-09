@@ -1,8 +1,14 @@
 [package]
 name = "etf"
 version = "0.1.0"
-authors = ["Serge Barral <sbarral@quintescience.com>"]
+authors = ["Serge Barral <serge@fi3k-barral.com>"]
 edition = "2018"
 
+[dev-dependencies]
+libm = "0.2"
+
 [dependencies]
-rand = "0.6"
+rand = "0.7"
+rand_pcg = "0.2"
+num-traits = "0.2"
+

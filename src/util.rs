@@ -1,14 +1,13 @@
 use crate::num::Float;
-use crate::table::Table;
-use crate::Envelope;
+use crate::{Envelope, InitTable, NodeArray, Partition};
 
 use rand::Rng;
-use std::cmp;
 
 mod error;
 pub use error::*;
 
 // Tridiagonal matrix algorithm.
+//
 // For the sake of efficiency, diagonal terms and RHS are modified in-place.
 // All slices have equal length.
 fn solve_tma<T: Float>(a: &[T], b: &mut [T], c: &[T], rhs: &mut [T], sol: &mut [T]) {
@@ -28,23 +27,26 @@ fn solve_tma<T: Float>(a: &[T], b: &mut [T], c: &[T], rhs: &mut [T], sol: &mut [
     }
 }
 
-/// Divides approximately evenly the area under a function.
+/// Generates a partition by dividing approximately evenly the area under a
+/// function.
 ///
-/// Function `f` is first approximated by a rectangular midpoint quadrature
-/// over a regular partition of [`x0`, `x1`] into `m` sub-intervals.
-/// Then, a non-regular partition of [`x0`, `x1`] is computed such that the
-/// area under the quadrature approximation is equal over each sub-interval
-/// The number of sub-intervals in this non-regular partition is inferred
-/// from the `Partition` type.
-pub fn midpoint_prepartition<T, F, P>(f: &F, x0: T, x1: T, m: usize) -> Box<P>
+/// Function `f` is first approximated by a rectangular midpoint quadrature over
+/// a regular partition of [`x0`, `x1`] into `m` sub-intervals. Then, a
+/// non-regular partition of [`x0`, `x1`] is computed such that the area under
+/// the quadrature approximation is equal over each sub-interval.
+///
+/// If argument `m` is zero, then the number of midpoint quadrature
+/// sub-intervals is set equal to the number of sub-intervals of the target
+/// partition.
+pub fn midpoint_prepartition<P, T, F>(f: &F, x0: T, x1: T, m: usize) -> NodeArray<P, T>
 where
+    P: Partition,
     T: Float,
     F: Fn(T) -> T,
-    P: AsRef<[T]> + AsMut<[T]> + Default,
 {
     // constants.
     let one_half = T::ONE / (T::ONE + T::ONE);
-    let m = cmp::max(m, 1); // at least one rectangle
+    let m = if m != 0 { m } else { P::SIZE };
 
     // Mid-point evaluation.
     let dx = (x1 - x0) / T::cast_usize(m);
@@ -53,10 +55,10 @@ where
         .collect();
 
     // Pre-allocate the result partition.
-    let mut x = Box::new(P::default());
+    let mut x = NodeArray::new();
     {
         // Choose abscissae that evenly split the area under the curve.
-        let x = (*x).as_mut();
+        let x = x.as_mut();
         let n = x.len() - 1;
         let ds = y.iter().fold(T::ZERO, |s, &y_| y_ + s) / T::cast_usize(n); // expected average sub-partition area
         let mut rect = 0;
@@ -69,8 +71,8 @@ where
             // Integrate `f` from `x0` until `a` is smaller than `a_rect`.
             while a_rect < a {
                 rect += 1;
-                a_rect += y[rect];
-                x_rect += dx;
+                a_rect = a_rect + y[rect];
+                x_rect = x_rect + dx;
             }
 
             // Interpolate `x`.
@@ -83,7 +85,7 @@ where
     x
 }
 
-/// Computes an ETF tabulation using Newton's method.
+/// Computes a distribution initialization table using Newton's method.
 ///
 /// A multivariate Newton method is used to compute a partition such that the
 /// rectangles making up an upper Riemann sum of function `f` have equal areas.
@@ -91,38 +93,39 @@ where
 /// If successful, the returned table contains the partition as well as the
 /// extrema of the function over each sub-interval.
 ///
-/// The function `f`, its derivative `df` and an ordered sequence of the
-/// extrema of `f` (boundary points excluded) must be provided, as well as a
-/// reasonable initial estimate of the partition.
+/// Function `f`, its derivative `df` and an ordered sequence of the extrema of
+/// `f` (boundary points excluded) must be provided, as well as a reasonable
+/// initial guess for the partition.
 ///
 /// Convergence is deemed achieved when the difference between the areas of the
-/// largest and smallest rectangles relatively to the average rectangle area is
-/// less than the specified tolerance. If convergence is not reached after the
-/// specified maximum number of iterations, a `TabulationError` is returned.
+/// largest rectangle and of the smallest rectangle relative to the average area
+/// of all rectangles is less than the specified tolerance. If convergence is
+/// not reached after the specified maximum number of iterations, a
+/// `TabulationError` is returned.
 ///
 /// A relaxation coefficient lower than 1 (resp. greater than 1) may be
 /// specified to improve convergence robustness (resp. speed).
-pub fn newton_tabulation<T, F, DF, A>(
+pub fn newton_tabulation<P, T, F, DF>(
     f: &F,
     df: &DF,
-    x_init: A::Partition,
+    x_init: &NodeArray<P, T>,
     x_extrema: &[T],
     tolerance: T,
     relaxation: T,
     max_iter: u32,
-) -> TabulationResult<Box<A>>
+) -> TabulationResult<InitTable<P, T>>
 where
+    P: Partition,
     T: Float,
     F: Fn(T) -> T,
     DF: Fn(T) -> T,
-    A: Table<T>,
 {
     // Initialize the quadrature table partition with the initial partition.
-    let mut table = Box::new(A::default());
-    table.as_mut_view().x.copy_from_slice(x_init.as_ref());
+    let mut table = InitTable::new();
+    table.x.as_mut().copy_from_slice(x_init.as_ref());
 
     // Main vectors.
-    let n = table.as_view().yinf.len();
+    let n = P::SIZE;
     let mut y = vec![T::ZERO; n + 1];
     let mut dx = vec![T::ZERO; n - 1];
     let mut dy_dx = vec![T::ZERO; n + 1];
@@ -137,14 +140,15 @@ where
     // Make a vector of the (x,y) tuples of all extrema that are actually
     // wihtin the partition.
     let extrema: Vec<(T, T)> = x_extrema
-        .iter().cloned()
+        .iter()
+        .cloned()
         .zip(y_extrema.iter().cloned())
-        .filter(|&(x_e, _)| (x_e > table.as_view().x[0]) && (x_e < table.as_view().x[n]))
+        .filter(|&(x_e, _)| (x_e > table.x.as_ref()[0]) && (x_e < table.x.as_ref()[n]))
         .collect();
 
     // Boundary values are constants.
-    y[0] = f(table.as_view().x[0]);
-    y[n] = f(table.as_view().x[n]);
+    y[0] = f(table.x.as_ref()[0]);
+    y[n] = f(table.x.as_ref()[n]);
     dy_dx[0] = T::ZERO;
     dy_dx[n] = T::ZERO;
 
@@ -152,10 +156,9 @@ where
     let mut loop_iter = 0..max_iter;
     loop {
         // Convenient aliases.
-        let table_mut_view = table.as_mut_view();
-        let x = table_mut_view.x;
-        let yinf = table_mut_view.yinf;
-        let ysup = table_mut_view.ysup;
+        let x = table.x.as_mut();
+        let yinf = table.yinf.as_mut();
+        let ysup = table.ysup.as_mut();
 
         // Update inner nodes values.
         for i in 1..n {
@@ -169,7 +172,7 @@ where
         let mut extrema_iter = extrema.iter();
         let mut extremum = extrema_iter.next(); // cached value of the last extremum
         let mut max_area = T::ZERO;
-        let mut min_area = T::INFINITY;
+        let mut min_area = T::infinity();
         let mut sum_area = T::ZERO;
         for i in 0..n {
             let (ysup_, dysup_dxl_, dysup_dxr_) = if y[i] > y[i + 1] {
@@ -200,7 +203,7 @@ where
             let area = ysup[i] * (x[i + 1] - x[i]).abs();
             max_area = max_area.max(area);
             min_area = min_area.min(area);
-            sum_area += area;
+            sum_area = sum_area + area;
         }
 
         // Return the table if convergence was achieved.
@@ -208,15 +211,16 @@ where
 
         if (max_area - min_area) < tolerance * mean_area {
             // At this point the areas differ slightly, which would introduce
-            // some bias when the partitions are sampled assuming
-            // equiprobability.
-            // A simple way to make all areas equal is to slightly increase
-            // the `ysup` values so as to make all areas equal to `max_area`.
-            // This makes the top-floor rejection slightly suboptimal, but
-            // the loss of efficiency is unlikely to be noticeable (at least
-            // for reasonable values of the tolerance).
+            // some bias when the partitions are sampled as the assumption of
+            // equiprobability would be violated.
+            //
+            // A simple way to cancel this bias is to slightly increase the
+            // `ysup` values so as to make all areas equal to `max_area`. This
+            // makes the top-floor rejection slightly suboptimal, but the loss
+            // of efficiency is unlikely to be noticeable for reasonable values
+            // of the tolerance.
             for i in 0..n {
-                ysup[i] = max_area/(x[i + 1] - x[i]).abs();
+                ysup[i] = max_area / (x[i + 1] - x[i]).abs();
             }
 
             // Determine the infimum yinf of y in [x[i], x[i+1]).
@@ -297,35 +301,31 @@ where
 /// Distribution envelope based on a shifted Weibull distribution tail.
 ///
 /// The tail of a shifted Weibull probability density function constitutes a
-/// reasonably efficient envelope function for many distributions while being
-/// at the same time relatively cheap to generate by inverse transform
-/// sampling.
+/// reasonably efficient envelope function for many distributions while being at
+/// the same time relatively cheap to generate by inverse transform sampling.
 ///
 /// The corresponding envelope function is:
 ///
 ///  `f(x) = w*a/|b|*((x-c)/b)^(a-1)*exp[-((x-c)/b)^a]`,
 ///
-/// if `x/b > x0/b` and:
-///   
-///  `f(x) = 0`,
+/// if `x/b > x0/b`, or `f(x) = 0` otherwise.
 ///
-/// otherwise.
 /// The parameters are:
 ///
-/// * `w`: the *weight* (amplitude) of the envelope relative to the normalized Weibull PDF
+/// * `w`: the *weight* (amplitude) of the envelope relative to the normalized
+///   Weibull PDF
 /// * `a>0`: the *scale* parameter
 /// * `b≠0`: the *shape* parameter
 /// * `c`: the *location* parameter
 /// * `x0`: the *cut-in* position at which the tail starts
 ///
 /// This generalization of the Weibull PDF can be shifted along the `x` axis
-/// (location parameter `c`) and can be mirrored with respect to `x=c` by
-/// using a negative `b`.
-/// The cut-in position of the tail must satisfy `x0 ≥ c` if `b>0` and
-/// `x0 ≤ c` if `b<0`.
+/// (location parameter `c`) and can be mirrored with respect to `x=c` by using
+/// a negative `b`. The cut-in position of the tail must satisfy `x0 ≥ c` if
+/// `b>0`, or `x0 ≤ c` if `b<0`.
 ///
-/// The weight `w` controls the vertical scaling of the function
-/// relative to the normalized Weibull PDF (`w=1`).
+/// The weight `w` controls the vertical scaling of the function relative to the
+/// normalized Weibull PDF (`w=1`).
 ///
 #[derive(Copy, Clone, Debug)]
 pub struct WeibullEnvelope<T, F> {
@@ -345,11 +345,11 @@ impl<T: Float, F: Fn(T) -> T> WeibullEnvelope<T, F> {
     /// density function.
     ///
     /// The probability density function `pdf` of the distribution to be sampled
-    /// must be below the envelope over the whole sampling range, that is for
+    /// must be below the envelope over the whole sampling range, meaning for
     /// all `x` greater than the cut-in tail position if the shape parameter is
     /// positive, or for all `x` lesser than the cut-in tail position if the
     /// shape parameter is negative.
-    pub fn new(scale: T, shape: T, location: T, cut_in: T, weight: T, pdf: F) -> Self {
+    pub fn new(weight: T, scale: T, shape: T, location: T, cut_in: T, pdf: F) -> Self {
         Self {
             a: scale,
             inv_a: T::ONE / scale,
@@ -380,7 +380,7 @@ impl<T: Float, F: Fn(T) -> T> Envelope<T> for WeibullEnvelope<T, F> {
         let y = self.s * z * T::exp(-x_scaled * z);
 
         let r_accept = T::gen(rng);
-        if y*r_accept <= (self.f)(x) {
+        if y * r_accept <= (self.f)(x) {
             Some(x)
         } else {
             None
