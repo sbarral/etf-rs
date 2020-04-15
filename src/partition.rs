@@ -21,7 +21,7 @@ pub struct NodeArray<P: Partition, T: Float> {
 impl<P: Partition, T: Float> NodeArray<P, T> {
     pub fn new() -> Self {
         let mut inner = Vec::with_capacity(P::SIZE + 1);
-        inner.resize_with(P::SIZE + 1, T::zero);
+        inner.resize(P::SIZE + 1, T::ZERO);
 
         Self {
             inner: inner,
@@ -66,7 +66,7 @@ pub struct IntervalArray<P: Partition, T: Float> {
 impl<P: Partition, T: Float> IntervalArray<P, T> {
     pub fn new() -> Self {
         let mut inner = Vec::with_capacity(P::SIZE);
-        inner.resize_with(P::SIZE, T::zero);
+        inner.resize(P::SIZE, T::ZERO);
         Self {
             inner: inner,
             phantom: PhantomData,

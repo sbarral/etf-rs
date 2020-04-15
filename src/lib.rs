@@ -4,8 +4,7 @@ use partition::*;
 pub use table_validation::*;
 
 // External traits.
-pub use rand::distributions::Distribution;
-use rand::{Rng, RngCore};
+use rand::{distributions::Distribution, Rng, RngCore};
 use std::marker::PhantomData;
 
 // Modules.

@@ -172,7 +172,7 @@ where
         let mut extrema_iter = extrema.iter();
         let mut extremum = extrema_iter.next(); // cached value of the last extremum
         let mut max_area = T::ZERO;
-        let mut min_area = T::infinity();
+        let mut min_area = T::INFINITY;
         let mut sum_area = T::ZERO;
         for i in 0..n {
             let (ysup_, dysup_dxl_, dysup_dxr_) = if y[i] > y[i + 1] {
