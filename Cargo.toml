@@ -6,9 +6,9 @@ edition = "2018"
 
 [dev-dependencies]
 libm = "0.2"
+rand_pcg = "0.2"
+rand_distr = "0.2"
 
 [dependencies]
 rand = "0.7"
-rand_pcg = "0.2"
-num-traits = "0.2"
 
