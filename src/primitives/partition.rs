@@ -1,3 +1,5 @@
+//! Interval partitions.
+
 use crate::num::Float;
 
 use std::borrow::{Borrow, BorrowMut};
@@ -99,7 +101,7 @@ impl<P: Partition, T: Float> BorrowMut<[T]> for IntervalArray<P, T> {
     }
 }
 
-/// Dataset required to build a distribution.
+/// Dataset for ETF distribution generation.
 #[derive(Clone, Default, PartialEq, PartialOrd, Eq, Ord, Hash)]
 pub struct InitTable<P: Partition, T: Float> {
     pub x: NodeArray<P, T>,
@@ -117,24 +119,30 @@ impl<P: Partition, T: Float> InitTable<P, T> {
 }
 
 macro_rules! make_partition_size {
-    ($s:expr, $ps:ident) => {
-        /// Partition size marker.
+    ($bits:expr, $sz: expr, $ps:ident, $szs:expr) => {
+        #[doc = "Size marker for "]
+        #[doc = $szs]
+        #[doc = "-interval partition."]
         #[derive(Copy, Clone, Default, PartialEq, PartialOrd, Eq, Ord, Hash)]
         pub struct $ps;
 
         impl Partition for $ps {
-            const BITS: u32 = $s;
-            const SIZE: usize = 1 << $s;
+            const BITS: u32 = $bits;
+            const SIZE: usize = $sz;
         }
     };
+
+    ($bits:expr, $sz:expr, $ps:ident) => {
+        make_partition_size!($bits, $sz, $ps, stringify!($sz));
+    }
 }
 
-make_partition_size!(4, P16);
-make_partition_size!(5, P32);
-make_partition_size!(6, P64);
-make_partition_size!(7, P128);
-make_partition_size!(8, P256);
-make_partition_size!(9, P512);
-make_partition_size!(10, P1024);
-make_partition_size!(11, P2048);
-make_partition_size!(12, P4096);
+make_partition_size!(4, 16, P16);
+make_partition_size!(5, 32, P32);
+make_partition_size!(6, 64, P64);
+make_partition_size!(7, 128, P128);
+make_partition_size!(8, 256, P256);
+make_partition_size!(9, 512, P512);
+make_partition_size!(10, 1024, P1024);
+make_partition_size!(11, 2048, P2048);
+make_partition_size!(12, 4096, P4096);

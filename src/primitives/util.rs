@@ -1,12 +1,14 @@
-use crate::num::Float;
-use crate::{Envelope, InitTable, NodeArray, Partition};
+//! Utilites for ETF distributions generation. 
+
+use crate::num::{Float, Func};
+use super::{Envelope, InitTable, NodeArray, Partition};
 
 use rand::Rng;
 
 mod error;
 pub use error::*;
 
-// Tridiagonal matrix algorithm.
+// Tri-diagonal matrix algorithm.
 //
 // For the sake of efficiency, diagonal terms and RHS are modified in-place.
 // All slices have equal length.
@@ -20,7 +22,7 @@ fn solve_tma<T: Float>(a: &[T], b: &mut [T], c: &[T], rhs: &mut [T], sol: &mut [
         rhs[i] = rhs[i] - pivot * rhs[i - 1];
     }
 
-    // Solve the remaining upper bidiagonal system.
+    // Solve the remaining upper bi-diagonal system.
     sol[m - 1] = rhs[m - 1] / b[m - 1];
     for i in (0..m - 1).rev() {
         sol[i] = (rhs[i] - c[i] * sol[i + 1]) / b[i];
@@ -42,7 +44,7 @@ pub fn midpoint_prepartition<P, T, F>(f: &F, x0: T, x1: T, m: usize) -> NodeArra
 where
     P: Partition,
     T: Float,
-    F: Fn(T) -> T,
+    F: Func<T>,
 {
     // constants.
     let one_half = T::ONE / (T::ONE + T::ONE);
@@ -51,7 +53,7 @@ where
     // Mid-point evaluation.
     let dx = (x1 - x0) / T::cast_usize(m);
     let y: Vec<T> = (0..m)
-        .map(|i| f(x0 + (T::cast_usize(i) + one_half) * dx))
+        .map(|i| f.eval(x0 + (T::cast_usize(i) + one_half) * dx))
         .collect();
 
     // Pre-allocate the result partition.
@@ -117,8 +119,8 @@ pub fn newton_tabulation<P, T, F, DF>(
 where
     P: Partition,
     T: Float,
-    F: Fn(T) -> T,
-    DF: Fn(T) -> T,
+    F: Func<T>,
+    DF: Func<T>,
 {
     // Initialize the quadrature table partition with the initial partition.
     let mut table = InitTable::new();
@@ -136,7 +138,7 @@ where
     let mut ds_dxl = vec![T::ZERO; n - 1];
     let mut ds_dxr = vec![T::ZERO; n - 1];
 
-    let y_extrema: Vec<T> = x_extrema.iter().cloned().map(f).collect();
+    let y_extrema: Vec<T> = x_extrema.iter().cloned().map(|x| f.eval(x)).collect();
     // Make a vector of the (x,y) tuples of all extrema that are actually
     // wihtin the partition.
     let extrema: Vec<(T, T)> = x_extrema
@@ -147,8 +149,8 @@ where
         .collect();
 
     // Boundary values are constants.
-    y[0] = f(table.x.as_ref()[0]);
-    y[n] = f(table.x.as_ref()[n]);
+    y[0] = f.eval(table.x.as_ref()[0]);
+    y[n] = f.eval(table.x.as_ref()[n]);
     dy_dx[0] = T::ZERO;
     dy_dx[n] = T::ZERO;
 
@@ -162,8 +164,8 @@ where
 
         // Update inner nodes values.
         for i in 1..n {
-            y[i] = f(x[i]);
-            dy_dx[i] = df(x[i]);
+            y[i] = f.eval(x[i]);
+            dy_dx[i] = df.eval(x[i]);
         }
 
         // Determine the supremum fsup of y within [x[i], x[i+1]),
@@ -340,7 +342,7 @@ pub struct WeibullEnvelope<T, F> {
     f: F,
 }
 
-impl<T: Float, F: Fn(T) -> T> WeibullEnvelope<T, F> {
+impl<T: Float, F: Func<T>> WeibullEnvelope<T, F> {
     /// Creates a new Weibull tail envelope distribution for a given probability
     /// density function.
     ///
@@ -371,7 +373,7 @@ impl<T: Float, F: Fn(T) -> T> WeibullEnvelope<T, F> {
     }
 }
 
-impl<T: Float, F: Fn(T) -> T> Envelope<T> for WeibullEnvelope<T, F> {
+impl<T: Float, F: Func<T>> Envelope<T> for WeibullEnvelope<T, F> {
     fn try_sample<R: Rng + ?Sized>(&self, rng: &mut R) -> Option<T> {
         let r = T::gen(rng);
         let x = self.c + self.b * T::powf(self.alpha - T::ln(T::ONE - r), self.inv_a);
@@ -380,7 +382,7 @@ impl<T: Float, F: Fn(T) -> T> Envelope<T> for WeibullEnvelope<T, F> {
         let y = self.s * z * T::exp(-x_scaled * z);
 
         let r_accept = T::gen(rng);
-        if y * r_accept <= (self.f)(x) {
+        if y * r_accept <= self.f.eval(x) {
             Some(x)
         } else {
             None

@@ -1,7 +1,5 @@
-use super::{new_test_rng, TestFloat};
-
+use super::util::{test_rng, TestFloat};
 use std::collections::HashSet;
-
 use rand::distributions::Distribution;
 
 /// Returns the upper-tail P-value for the exact distribution of collision
@@ -58,7 +56,7 @@ fn p_value(k: u64, n: u64, c: u64) -> f64 {
 /// The test is repeated several times, based on the `test_count` parameter.
 ///
 #[allow(dead_code)]
-pub fn collisions<T: TestFloat, D: Distribution<T>, F: Fn(T) -> T>(
+pub fn collisions<T: TestFloat, D: Distribution<T>, F: Fn(f64) -> f64>(
     distribution: D,
     cdf: F,
     dimension: u8,
@@ -68,17 +66,17 @@ pub fn collisions<T: TestFloat, D: Distribution<T>, F: Fn(T) -> T>(
 ) {
     let k = 1 << dimension;
     let n = k / urn_to_ball_ratio;
-    let k_float = T::cast_u64(k);
+    let k_float = k as f64;
     // Associate a real number in [0, 1) to an urn.
-    let find_urn = |r: T| (r * k_float).as_u64().min(k - 1);
+    let find_urn = |r| ((r * k_float) as u64).min(k - 1);
 
     let mut p_value_sum = 0f64;
-    let mut rng = new_test_rng();
+    let mut rng = test_rng();
     for _ in 0..test_count {
         let mut hash_set = HashSet::new();
         let mut collision_count = 0u64;
         for _ in 0..n {
-            let r = cdf(distribution.sample(&mut rng));
+            let r = cdf(distribution.sample(&mut rng).as_f64());
             let urn = find_urn(r);
             if !hash_set.insert(urn) {
                 collision_count += 1;

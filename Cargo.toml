@@ -7,8 +7,14 @@ edition = "2018"
 [dev-dependencies]
 libm = "0.2"
 rand_pcg = "0.2"
+rand_xoshiro = "0.4"
 rand_distr = "0.2"
+criterion = "0.3"
 
 [dependencies]
 rand = "0.7"
+
+[[bench]]
+name = "benchmark"
+harness = false
 

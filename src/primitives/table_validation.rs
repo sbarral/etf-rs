@@ -1,21 +1,23 @@
+//! Table size validity marker traits.
+
 use crate::num::Float;
-use crate::partition::*;
+use super::partition::*;
 
 
-/// Valid table size marker trait.
+/// Table size validity marker trait for asymmetric distributions.
 pub trait ValidPartitionSize<T: Float>: Partition {}
 
-/// Valid symmetric table size marker trait.
+/// Table size validity marker trait for symmetric distributions.
 pub trait ValidSymmetricPartitionSize<T: Float>: Partition {}
 
-// Valid tables sizes for f32.
+// Valid tables sizes for f32 (asymmetric distributions).
 impl ValidPartitionSize<f32> for P16 {}
 impl ValidPartitionSize<f32> for P32 {}
 impl ValidPartitionSize<f32> for P64 {}
 impl ValidPartitionSize<f32> for P128 {}
 impl ValidPartitionSize<f32> for P256 {}
 
-// Valid tables sizes for f64.
+// Valid tables sizes for f64 (asymmetric distributions).
 impl ValidPartitionSize<f64> for P16 {}
 impl ValidPartitionSize<f64> for P32 {}
 impl ValidPartitionSize<f64> for P64 {}
