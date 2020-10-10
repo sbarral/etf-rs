@@ -1,7 +1,7 @@
 //! Primitive ETF distributions and related utilities.
 
 // Internal traits.
-use crate::num::{UInt, Float, Func};
+use crate::num::{Float, Func, UInt};
 use partition::*;
 pub use table_validation::*;
 
@@ -243,7 +243,7 @@ where
     E: Envelope<T>,
 {
     pub fn new(func: F, table: &InitTable<P, T>, tail_envelope: E, tail_area: T) -> Self {
-        let tail_switch = compute_tail_switch(table, tail_area, 1);
+        let tail_switch = compute_tail_switch(table, tail_area);
         DistCentralTailed {
             data: process_table(T::ZERO, table, tail_switch),
             func,
@@ -263,43 +263,39 @@ where
 {
     #[inline(always)]
     fn sample<R: Rng + ?Sized>(&self, rng: &mut R) -> T {
+        let i_mask = (T::UInt::ONE << P::BITS) - T::UInt::ONE;
+        let u_mask = (T::UInt::ONE << T::SIGNIFICAND_BITS) - T::UInt::ONE;
         loop {
             let r = T::UInt::gen(rng);
 
-            // Extract the significand from the leftmost bits after the table index.
-            let u_mask = (T::UInt::ONE << (T::UInt::BITS - P::BITS - 1)) - T::UInt::ONE;
+            // Extract the significand from the rightmost bits.
             let u = r & u_mask;
 
             // Extract the table index from the P leftmost bits after the sign bit.
-            let i_mask = (T::UInt::ONE << P::BITS) - T::UInt::ONE;
             let i = ((r >> (T::UInt::BITS - P::BITS - 1)) & i_mask).as_usize();
 
-            // Extract the sign from the leftmost bit.
-            let s = if (r >> (T::UInt::BITS - 1)) != T::UInt::ZERO {
-                T::ONE
-            } else {
-                -T::ONE
-            };
-            
+            // Use the leftmost bit as the IEEE sign bit.
+            let s = r & (T::UInt::ONE << (T::UInt::BITS - 1));
             // Test for the common case (point below yinf).
             let d = &self.data.table[i];
-            if u < d.scaled_yratio {
-                return s * (d.x + d.scaled_dx * T::cast_uint(u));
+            if u < d.wedge_switch {
+                return T::uint_bitor(d.alpha + d.beta * T::uint_bitor(T::ONE, u), s);
             }
 
             // Check if the tail should be sampled.
             if u >= self.tail_switch {
                 if let Some(x) = self.tail_envelope.try_sample(rng) {
-                    return s * x;
+                    return T::uint_bitor(x, s);
                 }
                 continue;
             }
 
             // Wedge sampling, test y<f(x).
-            let dx = self.data.table[i + 1].x - d.x;
-            let x = d.x + T::gen(rng) * dx;
-            if T::cast_uint(u) * self.data.scaled_xysup < self.func.eval(x)*dx {
-                return s * x;
+            let xi = d.alpha + d.beta;
+            let dx = self.data.table[i + 1].alpha + self.data.table[i + 1].beta - xi;
+            let x = xi + T::gen(rng) * dx;
+            if T::cast_uint(u) * self.data.scaled_xysup < self.func.eval(x) * dx {
+                return T::uint_bitor(x, s);
             }
         }
     }
@@ -395,7 +391,7 @@ where
     E: Envelope<T>,
 {
     pub fn new(x0: T, func: F, table: &InitTable<P, T>, tail_envelope: E, tail_area: T) -> Self {
-        let tail_switch = compute_tail_switch(table, tail_area, 1);
+        let tail_switch = compute_tail_switch(table, tail_area);
 
         DistSymmetricTailed {
             data: process_table(x0, table, tail_switch),
@@ -417,56 +413,51 @@ where
 {
     #[inline(always)]
     fn sample<R: Rng + ?Sized>(&self, rng: &mut R) -> T {
+        let i_mask = (T::UInt::ONE << P::BITS) - T::UInt::ONE;
+        let u_mask = (T::UInt::ONE << T::SIGNIFICAND_BITS) - T::UInt::ONE;
         loop {
             let r = T::UInt::gen(rng);
 
-            // Extract the significand from the leftmost bits after the table index.
-            let u_mask = (T::UInt::ONE << (T::UInt::BITS - P::BITS - 1)) - T::UInt::ONE;
+            // Extract the significand from the rightmost bits.
             let u = r & u_mask;
 
             // Extract the table index from the P leftmost bits after the sign bit.
-            let i_mask = (T::UInt::ONE << P::BITS) - T::UInt::ONE;
-            let i = (r >> (T::UInt::BITS - P::BITS - 1)) & i_mask;
+            let i = ((r >> (T::UInt::BITS - P::BITS - 1)) & i_mask).as_usize();
 
-            // Extract the sign from the leftmost bit.
-            let s = if (r >> (T::UInt::BITS - 1)) != T::UInt::ZERO {
-                T::ONE
-            } else {
-                -T::ONE
-            };
+            // Use the leftmost bit as the IEEE sign bit.
+            let s = r & (T::UInt::ONE << (T::UInt::BITS - 1));
 
             // Test for the common case (point below yinf).
-            let i = i.as_usize();
             let d = &self.data.table[i];
-            if u < d.scaled_yratio {
-                return self.x0 + s * (d.x + d.scaled_dx * T::cast_uint(u));
+            if u < d.wedge_switch {
+                return self.x0 + T::uint_bitor(d.alpha + d.beta * T::uint_bitor(T::ONE, u), s);
             }
 
             // Check if the tail should be sampled.
             if u >= self.tail_switch {
                 if let Some(x) = self.tail_envelope.try_sample(rng) {
-                    return self.x0 + s * (x - self.x0);
+                    return self.x0 + T::uint_bitor(x, s);
                 }
                 continue;
             }
 
             // Wedge sampling, test y<f(x).
-            let dx = self.data.table[i + 1].x - d.x;
-            let x = d.x + T::gen(rng) * dx;
-            if T::cast_uint(u) * self.data.scaled_xysup < self.func.eval(x + self.x0)*dx {
-                return self.x0 + s * x;
+            let xi = d.alpha + d.beta;
+            let dx = self.data.table[i + 1].alpha + self.data.table[i + 1].beta - xi;
+            let x = xi + T::gen(rng) * dx;
+            if T::cast_uint(u) * self.data.scaled_xysup < self.func.eval(x + self.x0) * dx {
+                return self.x0 + T::uint_bitor(x, s);
             }
         }
     }
 }
 
-
 // Distribution table datum.
 #[derive(Copy, Clone)]
 struct TableDatum<T: Float> {
-    x: T,
-    scaled_dx: T,           // dx / scaled_yratio
-    scaled_yratio: T::UInt, // (yinf / ysup) * tail_switch
+    alpha: T,              // x[i] - beta[i]
+    beta: T,               // 2^SIGNIFICAND_BITS * (x[i+1] - x[i]) / wedge_switch[i]
+    wedge_switch: T::UInt, // (yinf / ysup) * tail_switch
 }
 
 #[derive(Clone)]
@@ -482,6 +473,7 @@ where
     T: Float,
 {
     let one_half = T::ONE / (T::ONE + T::ONE);
+    let max_switch = T::cast_uint(T::UInt::ONE << T::SIGNIFICAND_BITS);
     let n = P::SIZE;
     let mut table = Vec::with_capacity(n + 1);
 
@@ -493,37 +485,39 @@ where
     // Compute the final table.
     for i in 0..n {
         let yratio = yinf[i] / ysup[i];
-        let scaled_yratio = if yratio >= one_half {
+        let wedge_switch = //if yratio >= one_half {
             // Use baseline algorithm.
-            (yratio * T::cast_uint(tail_switch)).round_as_uint()
-        } else {
+            (yratio * T::cast_uint(tail_switch)).round_as_uint();
+        //} else {
             // Because the random number is mapped to [0:ysup], if yinf < 0.5*ysup then
             // more than 1 bit of accuracy will be lost after a random number in [0:ysup]
             // is narrowed down to [0:yinf] and subsequently reused as a random number within
             // this latter interval.
             // To prevent this loss of accuracy, wedge sampling is forced by setting yinf=0.
-            T::UInt::ZERO
-        };
-        // dx is scaled such that, once multiplied by a random number less than the
-        // critical wedge sampling threshold, its value will be in [0:dx].
-        let scaled_dx = (x[i + 1] - x[i]) / T::cast_uint(scaled_yratio);
+        //    T::UInt::ZERO
+        //};
+        // beta is scaled such that, once multiplied by a random number less
+        // than the critical wedge sampling threshold and divided by
+        // 2^SIGNIFICAND_BITS, its value will be distributed uniformly within
+        // [0:dx].
+        let beta = (x[i + 1] - x[i]) * (max_switch / T::cast_uint(wedge_switch));
 
         table.push(TableDatum {
-            x: x[i] - x0,
-            scaled_dx: scaled_dx,
-            scaled_yratio: scaled_yratio,
+            alpha: x[i] - x0 - beta,
+            beta,
+            wedge_switch,
         });
     }
 
     // Last datum is dummy except for the x value.
     table.push(TableDatum {
-        x: x[n] - x0,
-        scaled_dx: T::ZERO,
-        scaled_yratio: T::UInt::ZERO,
+        alpha: x[n] - x0,            // assumes beta==0.0
+        beta: T::ZERO,               // arbitrary, but must be consistent with alpha
+        wedge_switch: T::UInt::ZERO, // never used
     });
 
     // Scaled area of a single rectangle.
-    let scaled_xysup = (x[1] - x[0])*ysup[0]/T::cast_uint(tail_switch);
+    let scaled_xysup = (x[1] - x[0]) * ysup[0] / T::cast_uint(tail_switch);
 
     Data {
         table,
@@ -532,12 +526,12 @@ where
 }
 
 // Computes the integer used as a threshold for tail sampling.
-fn compute_tail_switch<P, T>(init_table: &InitTable<P, T>, tail_area: T, sign_bits: u32) -> T::UInt
+fn compute_tail_switch<P, T>(init_table: &InitTable<P, T>, tail_area: T) -> T::UInt
 where
     P: Partition,
     T: Float,
 {
-    let max_switch = T::UInt::ONE << (T::UInt::BITS - P::BITS - sign_bits);
+    let max_switch = T::UInt::ONE << T::SIGNIFICAND_BITS;
 
     // Convenient aliases.
     let x = init_table.x.as_ref();

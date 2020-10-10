@@ -1,6 +1,6 @@
 use rand::Rng;
 use std;
-use std::cmp::PartialOrd;
+use std::cmp::Ord;
 use std::fmt::{Debug, Display};
 use std::ops::{
     Add, AddAssign, BitAnd, BitOr, Div, DivAssign, Mul, MulAssign, Neg, Shl, Shr, Sub, SubAssign,
@@ -25,7 +25,7 @@ pub trait UInt:
     + SubAssign
     + MulAssign
     + DivAssign
-    + PartialOrd
+    + Ord
 {
     #[doc(hidden)]
     const BITS: u32;
@@ -122,6 +122,10 @@ pub trait Float:
     #[doc(hidden)]
     fn to_uint_bits(self) -> Self::UInt;
     #[doc(hidden)]
+    fn uint_bitor(self, u: Self::UInt) -> Self {
+        Self::from_uint_bits(self.to_uint_bits() | u)
+    }
+    #[doc(hidden)]
     fn min(self, other: Self) -> Self;
     #[doc(hidden)]
     fn max(self, other: Self) -> Self;
@@ -157,7 +161,7 @@ impl Float for f32 {
     #[doc(hidden)]
     const INFINITY: Self = std::f32::INFINITY;
     #[doc(hidden)]
-    const PI: Self = 3.14159265358979323846;
+    const PI: Self = std::f32::consts::PI;
 
     #[doc(hidden)]
     type UInt = u32;
@@ -246,7 +250,7 @@ impl Float for f64 {
     #[doc(hidden)]
     const INFINITY: Self = std::f64::INFINITY;
     #[doc(hidden)]
-    const PI: Self = 3.14159265358979323846;
+    const PI: Self = std::f64::consts::PI;
 
     #[doc(hidden)]
     type UInt = u64;
