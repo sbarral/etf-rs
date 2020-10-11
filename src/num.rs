@@ -3,7 +3,7 @@ use std;
 use std::cmp::Ord;
 use std::fmt::{Debug, Display};
 use std::ops::{
-    Add, AddAssign, BitAnd, BitOr, Div, DivAssign, Mul, MulAssign, Neg, Shl, Shr, Sub, SubAssign,
+    Add, AddAssign, BitAnd, BitOr, BitXor, Div, DivAssign, Mul, MulAssign, Neg, Shl, Shr, Sub, SubAssign,
 };
 
 /// An unsigned integer type.
@@ -21,6 +21,7 @@ pub trait UInt:
     + Shr<u32, Output = Self>
     + BitAnd<Output = Self>
     + BitOr<Output = Self>
+    + BitXor<Output = Self>
     + AddAssign
     + SubAssign
     + MulAssign
@@ -50,10 +51,12 @@ impl UInt for u32 {
     const ONE: Self = 1u32;
 
     #[doc(hidden)]
+    #[inline(always)]
     fn gen<R: Rng + ?Sized>(rng: &mut R) -> Self {
         rng.next_u32()
     }
     #[doc(hidden)]
+    #[inline(always)]
     fn as_usize(self) -> usize {
         self as usize
     }
@@ -68,10 +71,12 @@ impl UInt for u64 {
     const ONE: Self = 1u64;
 
     #[doc(hidden)]
+    #[inline(always)]
     fn gen<R: Rng + ?Sized>(rng: &mut R) -> Self {
         rng.next_u64()
     }
     #[doc(hidden)]
+    #[inline(always)]
     fn as_usize(self) -> usize {
         self as usize
     }
@@ -118,12 +123,13 @@ pub trait Float:
     #[doc(hidden)]
     fn cast_uint(u: Self::UInt) -> Self;
     #[doc(hidden)]
-    fn from_uint_bits(u: Self::UInt) -> Self;
+    fn from_bits(u: Self::UInt) -> Self;
     #[doc(hidden)]
-    fn to_uint_bits(self) -> Self::UInt;
+    fn to_bits(self) -> Self::UInt;
     #[doc(hidden)]
-    fn uint_bitor(self, u: Self::UInt) -> Self {
-        Self::from_uint_bits(self.to_uint_bits() | u)
+    #[inline(always)]
+    fn bitxor(self, u: Self::UInt) -> Self {
+        Self::from_bits(self.to_bits() | u)
     }
     #[doc(hidden)]
     fn min(self, other: Self) -> Self;
@@ -146,8 +152,6 @@ pub trait Float:
     #[doc(hidden)]
     fn mul_add(self, a: Self, b: Self) -> Self;
     #[doc(hidden)]
-    fn copysign(self, sign: Self) -> Self;
-    #[doc(hidden)]
     fn gen<R: Rng + ?Sized>(rng: &mut R) -> Self;
 }
 
@@ -167,74 +171,87 @@ impl Float for f32 {
     type UInt = u32;
 
     #[doc(hidden)]
+    #[inline(always)]
     fn as_uint(self) -> Self::UInt {
         self as Self::UInt
     }
     #[doc(hidden)]
+    #[inline(always)]
     fn round_as_uint(self) -> Self::UInt {
         self.round() as Self::UInt
     }
     #[doc(hidden)]
+    #[inline(always)]
     fn cast_usize(u: usize) -> Self {
         u as Self
     }
     #[doc(hidden)]
+    #[inline(always)]
     fn cast_uint(u: Self::UInt) -> Self {
         u as Self
     }
     #[doc(hidden)]
-    fn from_uint_bits(u: Self::UInt) -> Self {
+    #[inline(always)]
+    fn from_bits(u: Self::UInt) -> Self {
         Self::from_bits(u)
     }
     #[doc(hidden)]
-    fn to_uint_bits(self) -> Self::UInt {
+    #[inline(always)]
+    fn to_bits(self) -> Self::UInt {
         self.to_bits()
     }
     #[doc(hidden)]
+    #[inline(always)]
     fn min(self, other: Self) -> Self {
         self.min(other)
     }
     #[doc(hidden)]
+    #[inline(always)]
     fn max(self, other: Self) -> Self {
         self.max(other)
     }
     #[doc(hidden)]
+    #[inline(always)]
     fn abs(self) -> Self {
         self.abs()
     }
     #[doc(hidden)]
+    #[inline(always)]
     fn sqrt(self) -> Self {
         self.sqrt()
     }
     #[doc(hidden)]
+    #[inline(always)]
     fn ln(self) -> Self {
         self.ln()
     }
     #[doc(hidden)]
+    #[inline(always)]
     fn exp(self) -> Self {
         self.exp()
     }
     #[doc(hidden)]
+    #[inline(always)]
     fn powf(self, exponent: Self) -> Self {
         self.powf(exponent)
     }
     #[doc(hidden)]
+    #[inline(always)]
     fn erf(self) -> Self {
         unsafe { cmath::erff(self) }
     }
     #[doc(hidden)]
+    #[inline(always)]
     fn erfc(self) -> Self {
         unsafe { cmath::erfcf(self) }
     }
     #[doc(hidden)]
+    #[inline(always)]
     fn mul_add(self, a: Self, b: Self) -> Self {
         self.mul_add(a, b)
     }
     #[doc(hidden)]
-    fn copysign(self, sign: Self) -> Self {
-        self.copysign(sign)
-    }
-    #[doc(hidden)]
+    #[inline(always)]
     fn gen<R: Rng + ?Sized>(rng: &mut R) -> Self {
         rng.gen()
     }
@@ -268,62 +285,72 @@ impl Float for f64 {
         u as Self
     }
     #[doc(hidden)]
+    #[inline(always)]
     fn cast_uint(u: Self::UInt) -> Self {
         u as Self
     }
     #[doc(hidden)]
-    fn from_uint_bits(u: Self::UInt) -> Self {
+    #[inline(always)]
+    fn from_bits(u: Self::UInt) -> Self {
         Self::from_bits(u)
     }
     #[doc(hidden)]
-    fn to_uint_bits(self) -> Self::UInt {
+    #[inline(always)]
+    fn to_bits(self) -> Self::UInt {
         self.to_bits()
     }
     #[doc(hidden)]
+    #[inline(always)]
     fn min(self, other: Self) -> Self {
         self.min(other)
     }
     #[doc(hidden)]
+    #[inline(always)]
     fn max(self, other: Self) -> Self {
         self.max(other)
     }
     #[doc(hidden)]
+    #[inline(always)]
     fn abs(self) -> Self {
         self.abs()
     }
     #[doc(hidden)]
+    #[inline(always)]
     fn sqrt(self) -> Self {
         self.sqrt()
     }
     #[doc(hidden)]
+    #[inline(always)]
     fn ln(self) -> Self {
         self.ln()
     }
     #[doc(hidden)]
+    #[inline(always)]
     fn exp(self) -> Self {
         self.exp()
     }
     #[doc(hidden)]
+    #[inline(always)]
     fn powf(self, exponent: Self) -> Self {
         self.powf(exponent)
     }
     #[doc(hidden)]
+    #[inline(always)]
     fn erf(self) -> Self {
         unsafe { cmath::erf(self) }
     }
     #[doc(hidden)]
+    #[inline(always)]
     fn erfc(self) -> Self {
         unsafe { cmath::erfc(self) }
     }
     #[doc(hidden)]
+    #[inline(always)]
     fn mul_add(self, a: Self, b: Self) -> Self {
         self.mul_add(a, b)
     }
     #[doc(hidden)]
-    fn copysign(self, sign: Self) -> Self {
-        self.copysign(sign)
-    }
-    #[doc(hidden)]
+    #[inline(always)]
     fn gen<R: Rng + ?Sized>(rng: &mut R) -> Self {
         rng.gen()
     }
@@ -340,6 +367,7 @@ pub trait Func<T> {
 }
 
 impl<T: Float, F: Fn(T) -> T> Func<T> for F {
+    #[inline(always)]
     fn eval(&self, x: T) -> T {
         (*self)(x)
     }

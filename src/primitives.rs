@@ -279,23 +279,22 @@ where
             // Test for the common case (point below yinf).
             let d = &self.data.table[i];
             if u < d.wedge_switch {
-                return T::uint_bitor(d.alpha + d.beta * T::uint_bitor(T::ONE, u), s);
+                return T::bitxor(d.alpha + d.beta * T::cast_uint(u), s);
             }
 
             // Check if the tail should be sampled.
             if u >= self.tail_switch {
                 if let Some(x) = self.tail_envelope.try_sample(rng) {
-                    return T::uint_bitor(x, s);
+                    return T::bitxor(x, s);
                 }
                 continue;
             }
 
             // Wedge sampling, test y<f(x).
-            let xi = d.alpha + d.beta;
-            let dx = self.data.table[i + 1].alpha + self.data.table[i + 1].beta - xi;
-            let x = xi + T::gen(rng) * dx;
+            let dx = self.data.table[i + 1].alpha - d.alpha;
+            let x = d.alpha + T::gen(rng) * dx;
             if T::cast_uint(u) * self.data.scaled_xysup < self.func.eval(x) * dx {
-                return T::uint_bitor(x, s);
+                return T::bitxor(x, s);
             }
         }
     }
@@ -430,23 +429,22 @@ where
             // Test for the common case (point below yinf).
             let d = &self.data.table[i];
             if u < d.wedge_switch {
-                return self.x0 + T::uint_bitor(d.alpha + d.beta * T::uint_bitor(T::ONE, u), s);
+                return self.x0 + T::bitxor(d.alpha + d.beta * T::cast_uint(u), s);
             }
 
             // Check if the tail should be sampled.
             if u >= self.tail_switch {
                 if let Some(x) = self.tail_envelope.try_sample(rng) {
-                    return self.x0 + T::uint_bitor(x, s);
+                    return self.x0 + T::bitxor(x - self.x0, s);
                 }
                 continue;
             }
 
             // Wedge sampling, test y<f(x).
-            let xi = d.alpha + d.beta;
-            let dx = self.data.table[i + 1].alpha + self.data.table[i + 1].beta - xi;
-            let x = xi + T::gen(rng) * dx;
-            if T::cast_uint(u) * self.data.scaled_xysup < self.func.eval(x + self.x0) * dx {
-                return self.x0 + T::uint_bitor(x, s);
+            let dx = self.data.table[i + 1].alpha - d.alpha;
+            let delta_x = d.alpha + T::gen(rng) * dx;
+            if T::cast_uint(u) * self.data.scaled_xysup < self.func.eval(self.x0 + delta_x) * dx {
+                return self.x0 + T::bitxor(delta_x, s);
             }
         }
     }
@@ -455,8 +453,8 @@ where
 // Distribution table datum.
 #[derive(Copy, Clone)]
 struct TableDatum<T: Float> {
-    alpha: T,              // x[i] - beta[i]
-    beta: T,               // 2^SIGNIFICAND_BITS * (x[i+1] - x[i]) / wedge_switch[i]
+    alpha: T,              // x[i] - x0
+    beta: T,               // (x[i+1] - x[i]) / wedge_switch[i]
     wedge_switch: T::UInt, // (yinf / ysup) * tail_switch
 }
 
@@ -500,10 +498,10 @@ where
         // than the critical wedge sampling threshold and divided by
         // 2^SIGNIFICAND_BITS, its value will be distributed uniformly within
         // [0:dx].
-        let beta = (x[i + 1] - x[i]) * (max_switch / T::cast_uint(wedge_switch));
+        let beta = (x[i + 1] - x[i]) / T::cast_uint(wedge_switch);
 
         table.push(TableDatum {
-            alpha: x[i] - x0 - beta,
+            alpha: x[i] - x0,
             beta,
             wedge_switch,
         });
@@ -511,8 +509,8 @@ where
 
     // Last datum is dummy except for the x value.
     table.push(TableDatum {
-        alpha: x[n] - x0,            // assumes beta==0.0
-        beta: T::ZERO,               // arbitrary, but must be consistent with alpha
+        alpha: x[n] - x0,
+        beta: T::ZERO, // never used
         wedge_switch: T::UInt::ZERO, // never used
     });
 
