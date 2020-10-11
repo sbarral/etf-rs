@@ -99,6 +99,7 @@ pub trait Float:
     + DivAssign
     + PartialOrd
     + From<f32>
+    + Display
 {
     #[doc(hidden)]
     const SIGNIFICAND_BITS: u32;
@@ -119,6 +120,8 @@ pub trait Float:
     #[doc(hidden)]
     fn round_as_uint(self) -> Self::UInt;
     #[doc(hidden)]
+    fn cast_u32(u: u32) -> Self;
+    #[doc(hidden)]
     fn cast_usize(u: usize) -> Self;
     #[doc(hidden)]
     fn cast_uint(u: Self::UInt) -> Self;
@@ -129,7 +132,7 @@ pub trait Float:
     #[doc(hidden)]
     #[inline(always)]
     fn bitxor(self, u: Self::UInt) -> Self {
-        Self::from_bits(self.to_bits() | u)
+        Self::from_bits(self.to_bits() ^ u)
     }
     #[doc(hidden)]
     fn min(self, other: Self) -> Self;
@@ -141,6 +144,8 @@ pub trait Float:
     fn sqrt(self) -> Self;
     #[doc(hidden)]
     fn ln(self) -> Self;
+    #[doc(hidden)]
+    fn log2(self) -> Self;
     #[doc(hidden)]
     fn exp(self) -> Self;
     #[doc(hidden)]
@@ -179,6 +184,11 @@ impl Float for f32 {
     #[inline(always)]
     fn round_as_uint(self) -> Self::UInt {
         self.round() as Self::UInt
+    }
+    #[doc(hidden)]
+    #[inline(always)]
+    fn cast_u32(u: u32) -> Self {
+        u as Self
     }
     #[doc(hidden)]
     #[inline(always)]
@@ -224,6 +234,11 @@ impl Float for f32 {
     #[inline(always)]
     fn ln(self) -> Self {
         self.ln()
+    }
+    #[doc(hidden)]
+    #[inline(always)]
+    fn log2(self) -> Self {
+        self.log2()
     }
     #[doc(hidden)]
     #[inline(always)]
@@ -273,14 +288,22 @@ impl Float for f64 {
     type UInt = u64;
 
     #[doc(hidden)]
+    #[inline(always)]
     fn as_uint(self) -> Self::UInt {
         self as Self::UInt
     }
     #[doc(hidden)]
+    #[inline(always)]
     fn round_as_uint(self) -> Self::UInt {
         self.round() as Self::UInt
     }
     #[doc(hidden)]
+    #[inline(always)]
+    fn cast_u32(u: u32) -> Self {
+        u as Self
+    }
+    #[doc(hidden)]
+    #[inline(always)]
     fn cast_usize(u: usize) -> Self {
         u as Self
     }
@@ -323,6 +346,11 @@ impl Float for f64 {
     #[inline(always)]
     fn ln(self) -> Self {
         self.ln()
+    }
+    #[doc(hidden)]
+    #[inline(always)]
+    fn log2(self) -> Self {
+        self.log2()
     }
     #[doc(hidden)]
     #[inline(always)]
