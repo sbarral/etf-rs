@@ -277,7 +277,11 @@ where
             // Test for the common case (point below yinf).
             let d = &self.data.table[i];
             if u < d.wedge_switch {
-                return T::bitxor(d.alpha * T::cast_uint(u) + d.beta, s);
+                if cfg!(feature = "fma") {
+                    return T::bitxor(T::cast_uint(u).mul_add(d.alpha, d.beta), s);
+                } else {
+                    return T::bitxor(d.alpha * T::cast_uint(u) + d.beta, s);
+                }
             }
 
             // Check if the tail should be sampled.
@@ -425,7 +429,11 @@ where
             // Test for the common case (point below yinf).
             let d = &self.data.table[i];
             if u < d.wedge_switch {
-                return self.x0 + T::bitxor(d.alpha * T::cast_uint(u) + d.beta, s);
+                if cfg!(feature = "fma") {
+                    return self.x0 + T::bitxor(T::cast_uint(u).mul_add(d.alpha, d.beta), s);
+                } else {
+                    return self.x0 + T::bitxor(d.alpha * T::cast_uint(u) + d.beta, s);
+                }
             }
 
             // Check if the tail should be sampled.

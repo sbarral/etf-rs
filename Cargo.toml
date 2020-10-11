@@ -4,6 +4,11 @@ version = "0.1.0"
 authors = ["Serge Barral <serge@fi3k-barral.com>"]
 edition = "2018"
 
+[features]
+# Use fused multiply-add.
+# May be faster if supported by the target, but not necessarily.
+fma = []
+
 [dev-dependencies]
 libm = "0.2"
 rand_pcg = "0.2"
