@@ -34,6 +34,8 @@ pub trait UInt:
     const ZERO: Self;
     #[doc(hidden)]
     const ONE: Self;
+    #[doc(hidden)]
+    const MAX: Self;
 
     #[doc(hidden)]
     fn gen<R: Rng + ?Sized>(rng: &mut R) -> Self;
@@ -49,6 +51,8 @@ impl UInt for u32 {
     const ZERO: Self = 0u32;
     #[doc(hidden)]
     const ONE: Self = 1u32;
+    #[doc(hidden)]
+    const MAX: Self = u32::MAX;
 
     #[doc(hidden)]
     #[inline(always)]
@@ -69,6 +73,8 @@ impl UInt for u64 {
     const ZERO: Self = 0u64;
     #[doc(hidden)]
     const ONE: Self = 1u64;
+    #[doc(hidden)]
+    const MAX: Self = u64::MAX;
 
     #[doc(hidden)]
     #[inline(always)]

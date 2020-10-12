@@ -243,7 +243,7 @@ where
     E: Envelope<T>,
 {
     pub fn new(func: F, table: &InitTable<P, T>, tail_envelope: E, tail_area: T) -> Self {
-        let tail_switch = compute_tail_switch(table, tail_area, 1);
+        let tail_switch = compute_tail_switch(table, tail_area);
         DistCentralTailed {
             data: process_table(T::ZERO, table, tail_switch),
             func,
@@ -267,16 +267,17 @@ where
             let r = T::UInt::gen(rng);
 
             // Extract the significand from the rightmost bits.
-            let u = (r << (1 + P::BITS)) >> (1 + P::BITS);
+            let u = r << (1 + P::BITS);
 
             // Extract the table index from the P leftmost bits after the sign bit.
             let i = ((r << 1) >> (T::UInt::BITS - P::BITS)).as_usize();
 
             // Use the leftmost bit as the IEEE sign bit.
-            let s = r & (T::UInt::ONE << (T::UInt::BITS - 1));
+            let s = (r >> (T::UInt::BITS - 1)) << (T::UInt::BITS - 1);
+
             // Test for the common case (point below yinf).
             let d = &self.data.table[i];
-            if u < d.wedge_switch {
+            if u <= d.wedge_switch {
                 if cfg!(feature = "fma") {
                     return T::bitxor(T::cast_uint(u).mul_add(d.alpha, d.beta), s);
                 } else {
@@ -285,7 +286,7 @@ where
             }
 
             // Check if the tail should be sampled.
-            if u >= self.tail_switch {
+            if u > self.tail_switch {
                 if let Some(x) = self.tail_envelope.try_sample(rng) {
                     return T::bitxor(x, s);
                 }
@@ -392,7 +393,7 @@ where
     E: Envelope<T>,
 {
     pub fn new(x0: T, func: F, table: &InitTable<P, T>, tail_envelope: E, tail_area: T) -> Self {
-        let tail_switch = compute_tail_switch(table, tail_area, 1);
+        let tail_switch = compute_tail_switch(table, tail_area);
 
         DistSymmetricTailed {
             data: process_table(x0, table, tail_switch),
@@ -418,17 +419,17 @@ where
             let r = T::UInt::gen(rng);
 
             // Extract the significand from the rightmost bits.
-            let u = (r << (1 + P::BITS)) >> (1 + P::BITS);
+            let u = r << (1 + P::BITS);
 
             // Extract the table index from the P leftmost bits after the sign bit.
             let i = ((r << 1) >> (T::UInt::BITS - P::BITS)).as_usize();
 
             // Use the leftmost bit as the IEEE sign bit.
-            let s = r & (T::UInt::ONE << (T::UInt::BITS - 1));
-
+            let s = (r >> (T::UInt::BITS - 1)) << (T::UInt::BITS - 1);
+            
             // Test for the common case (point below yinf).
             let d = &self.data.table[i];
-            if u < d.wedge_switch {
+            if u <= d.wedge_switch {
                 if cfg!(feature = "fma") {
                     return self.x0 + T::bitxor(T::cast_uint(u).mul_add(d.alpha, d.beta), s);
                 } else {
@@ -437,7 +438,7 @@ where
             }
 
             // Check if the tail should be sampled.
-            if u >= self.tail_switch {
+            if u > self.tail_switch {
                 if let Some(x) = self.tail_envelope.try_sample(rng) {
                     return self.x0 + T::bitxor(x - self.x0, s);
                 }
@@ -486,19 +487,19 @@ where
     // Compute the final table.
     for i in 0..n {
         // When a rectangular quartile is sampled, the position between x[i] and
-        // x[i+1] is generated using a random number that is already constrained
-        // to the interval [0:(yinf/ysup)*tail_switch]. When yinf/ysup is very
-        // small, this means that the position is computed with a very coarse
-        // resolution. Sampling quality is in this case preserved by setting
-        // yinf=0, which unconditionally forces the use of the (computationally
-        // more expensive) wedge sampling algorithm.
+        // x[i+1] is generated using a random number within the range
+        // [0:(yinf/ysup)*tail_switch]. When yinf/ysup is very small, this
+        // implies that the position is computed with a very coarse resolution.
+        // In order to avoid this loss of sampling quality, yinf is in such case
+        // set to 0, which unconditionally forces the use of the
+        // more expensive but higher quality wedge sampling algorithm.
         let w = yinf[i] / ysup[i] * T::cast_uint(tail_switch);
         let bit_loss = T::cast_u32(T::SIGNIFICAND_BITS) - w.log2();
         let (wedge_switch, alpha) = if bit_loss <= max_bit_loss {
             // Coefficients for the baseline sampling algorithm.
-            let b = (x[i + 1] - x[i]) / w;
+            let alpha = (x[i + 1] - x[i]) / w;
 
-            (w.round_as_uint(), b)
+            (round_as_uint_saturating(w), alpha)
         } else {
             // Degraded case: force wedge sampling algorithm.
             (T::UInt::ZERO, T::ZERO)
@@ -528,13 +529,11 @@ where
 }
 
 // Computes the integer used as a threshold for tail sampling.
-fn compute_tail_switch<P, T>(init_table: &InitTable<P, T>, tail_area: T, sign_bits: u32) -> T::UInt
+fn compute_tail_switch<P, T>(init_table: &InitTable<P, T>, tail_area: T) -> T::UInt
 where
     P: Partition,
     T: Float,
 {
-    let max_switch = T::UInt::ONE << (T::UInt::BITS - P::BITS - sign_bits);
-
     // Convenient aliases.
     let x = init_table.x.as_ref();
     let ysup = init_table.ysup.as_ref();
@@ -543,6 +542,15 @@ where
     for i in 0..P::SIZE {
         area = area + (x[i + 1] - x[i]) * ysup[i];
     }
-    let switch = T::cast_uint(max_switch) * (area / (area + tail_area));
-    switch.round_as_uint()
+    let switch = T::cast_uint(T::UInt::MAX) * (area / (area + tail_area));
+
+    round_as_uint_saturating(switch)
+}
+
+fn round_as_uint_saturating<T: Float>(a: T) -> T::UInt {
+    if a < T::cast_uint(T::UInt::MAX) {
+        a.round_as_uint()
+    } else {
+        T::UInt::MAX
+    }
 }
