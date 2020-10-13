@@ -1,5 +1,6 @@
 use criterion::{criterion_group, criterion_main, Criterion};
 use etf::distributions::CentralNormal;
+use etf::primitives::Distribution as _;
 use rand::distributions::Distribution;
 use rand_distr;
 //use rand_pcg;

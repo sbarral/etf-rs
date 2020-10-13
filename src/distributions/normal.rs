@@ -1,6 +1,6 @@
 use crate::num::{Float, Func};
 use crate::primitives::*;
-use rand::{distributions::Distribution, Rng};
+use rand_core::RngCore;
 
 /// Non-normalized normal probability distribution function with arbitrary mean
 /// and standard deviation.
@@ -52,7 +52,7 @@ impl<T: Float> NormalTailEnvelope<T> {
 
 impl<T: Float> Envelope<T> for NormalTailEnvelope<T> {
     #[inline(always)]
-    fn try_sample<R: Rng + ?Sized>(&self, rng: &mut R) -> Option<T> {
+    fn try_sample<R: RngCore + ?Sized>(&self, rng: &mut R) -> Option<T> {
         loop {
             let x = (T::ONE - T::gen(rng)).ln() * self.a_x;
             let y = (T::ONE - T::gen(rng)).ln() * self.a_y;
@@ -141,7 +141,7 @@ impl<T: Float + NormalFloat> Normal<T> {
 
 impl<T: Float + NormalFloat> Distribution<T> for Normal<T> {
     #[inline(always)]
-    fn sample<R: Rng + ?Sized>(&self, rng: &mut R) -> T {
+    fn sample<R: RngCore + ?Sized>(&self, rng: &mut R) -> T {
         self.inner.sample(rng)
     }
 }
@@ -170,7 +170,7 @@ impl<T: Float + NormalFloat> CentralNormal<T> {
 
 impl<T: Float + NormalFloat> Distribution<T> for CentralNormal<T> {
     #[inline(always)]
-    fn sample<R: Rng + ?Sized>(&self, rng: &mut R) -> T {
+    fn sample<R: RngCore + ?Sized>(&self, rng: &mut R) -> T {
         self.inner.sample(rng)
     }
 }

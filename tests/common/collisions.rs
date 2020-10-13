@@ -1,6 +1,6 @@
 use super::util::{test_rng, TestFloat};
 use std::collections::HashSet;
-use rand::distributions::Distribution;
+use etf::primitives::Distribution;
 
 /// Returns the upper-tail P-value for the exact distribution of collision
 /// events, based on Knuth' algorithm.

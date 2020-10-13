@@ -1,6 +1,6 @@
 use super::util::{test_rng, TestFloat};
 use etf::num::Float;
-use rand::distributions::Distribution;
+use etf::primitives::Distribution;
 
 /// A set of sampling bins regularly distributed between `x0` and `x1`.
 ///

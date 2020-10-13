@@ -3,7 +3,7 @@
 use crate::num::{Float, Func};
 use super::{Envelope, InitTable, NodeArray, Partition};
 
-use rand::Rng;
+use rand_core::RngCore;
 
 mod error;
 pub use error::*;
@@ -374,7 +374,7 @@ impl<T: Float, F: Func<T>> WeibullEnvelope<T, F> {
 }
 
 impl<T: Float, F: Func<T>> Envelope<T> for WeibullEnvelope<T, F> {
-    fn try_sample<R: Rng + ?Sized>(&self, rng: &mut R) -> Option<T> {
+    fn try_sample<R: RngCore + ?Sized>(&self, rng: &mut R) -> Option<T> {
         let r = T::gen(rng);
         let x = self.c + self.b * T::powf(self.alpha - T::ln(T::ONE - r), self.inv_a);
         let x_scaled = (x - self.c) * self.inv_b;

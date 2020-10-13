@@ -1,4 +1,4 @@
-use rand::Rng;
+use rand_core::RngCore;
 use std;
 use std::cmp::Ord;
 use std::fmt::{Debug, Display};
@@ -38,7 +38,7 @@ pub trait UInt:
     const MAX: Self;
 
     #[doc(hidden)]
-    fn gen<R: Rng + ?Sized>(rng: &mut R) -> Self;
+    fn gen<R: RngCore + ?Sized>(rng: &mut R) -> Self;
 
     #[doc(hidden)]
     fn as_usize(self) -> usize;
@@ -55,12 +55,12 @@ impl UInt for u32 {
     const MAX: Self = u32::MAX;
 
     #[doc(hidden)]
-    #[inline(always)]
-    fn gen<R: Rng + ?Sized>(rng: &mut R) -> Self {
+    #[inline]
+    fn gen<R: RngCore + ?Sized>(rng: &mut R) -> Self {
         rng.next_u32()
     }
     #[doc(hidden)]
-    #[inline(always)]
+    #[inline]
     fn as_usize(self) -> usize {
         self as usize
     }
@@ -77,12 +77,12 @@ impl UInt for u64 {
     const MAX: Self = u64::MAX;
 
     #[doc(hidden)]
-    #[inline(always)]
-    fn gen<R: Rng + ?Sized>(rng: &mut R) -> Self {
+    #[inline]
+    fn gen<R: RngCore + ?Sized>(rng: &mut R) -> Self {
         rng.next_u64()
     }
     #[doc(hidden)]
-    #[inline(always)]
+    #[inline]
     fn as_usize(self) -> usize {
         self as usize
     }
@@ -136,7 +136,7 @@ pub trait Float:
     #[doc(hidden)]
     fn to_bits(self) -> Self::UInt;
     #[doc(hidden)]
-    #[inline(always)]
+    #[inline]
     fn bitxor(self, u: Self::UInt) -> Self {
         Self::from_bits(self.to_bits() ^ u)
     }
@@ -163,7 +163,13 @@ pub trait Float:
     #[doc(hidden)]
     fn mul_add(self, a: Self, b: Self) -> Self;
     #[doc(hidden)]
-    fn gen<R: Rng + ?Sized>(rng: &mut R) -> Self;
+    #[inline]
+    fn gen<R: RngCore + ?Sized>(rng: &mut R) -> Self {
+        let scale = Self::ONE / Self::cast_uint(Self::UInt::ONE << (Self::SIGNIFICAND_BITS + 1));
+        let r = Self::UInt::gen(rng) >> (Self::UInt::BITS - Self::SIGNIFICAND_BITS - 1);
+
+        scale * Self::cast_uint(r)
+    }
 }
 
 impl Float for f32 {
@@ -182,99 +188,94 @@ impl Float for f32 {
     type UInt = u32;
 
     #[doc(hidden)]
-    #[inline(always)]
+    #[inline]
     fn as_uint(self) -> Self::UInt {
         self as Self::UInt
     }
     #[doc(hidden)]
-    #[inline(always)]
+    #[inline]
     fn round_as_uint(self) -> Self::UInt {
         self.round() as Self::UInt
     }
     #[doc(hidden)]
-    #[inline(always)]
+    #[inline]
     fn cast_u32(u: u32) -> Self {
         u as Self
     }
     #[doc(hidden)]
-    #[inline(always)]
+    #[inline]
     fn cast_usize(u: usize) -> Self {
         u as Self
     }
     #[doc(hidden)]
-    #[inline(always)]
+    #[inline]
     fn cast_uint(u: Self::UInt) -> Self {
         u as Self
     }
     #[doc(hidden)]
-    #[inline(always)]
+    #[inline]
     fn from_bits(u: Self::UInt) -> Self {
         Self::from_bits(u)
     }
     #[doc(hidden)]
-    #[inline(always)]
+    #[inline]
     fn to_bits(self) -> Self::UInt {
         self.to_bits()
     }
     #[doc(hidden)]
-    #[inline(always)]
+    #[inline]
     fn min(self, other: Self) -> Self {
         self.min(other)
     }
     #[doc(hidden)]
-    #[inline(always)]
+    #[inline]
     fn max(self, other: Self) -> Self {
         self.max(other)
     }
     #[doc(hidden)]
-    #[inline(always)]
+    #[inline]
     fn abs(self) -> Self {
         self.abs()
     }
     #[doc(hidden)]
-    #[inline(always)]
+    #[inline]
     fn sqrt(self) -> Self {
         self.sqrt()
     }
     #[doc(hidden)]
-    #[inline(always)]
+    #[inline]
     fn ln(self) -> Self {
         self.ln()
     }
     #[doc(hidden)]
-    #[inline(always)]
+    #[inline]
     fn log2(self) -> Self {
         self.log2()
     }
     #[doc(hidden)]
-    #[inline(always)]
+    #[inline]
     fn exp(self) -> Self {
         self.exp()
     }
     #[doc(hidden)]
-    #[inline(always)]
+    #[inline]
     fn powf(self, exponent: Self) -> Self {
         self.powf(exponent)
     }
     #[doc(hidden)]
-    #[inline(always)]
+    #[inline]
     fn erf(self) -> Self {
         unsafe { cmath::erff(self) }
     }
     #[doc(hidden)]
-    #[inline(always)]
+    #[inline]
     fn erfc(self) -> Self {
         unsafe { cmath::erfcf(self) }
     }
     #[doc(hidden)]
-    #[inline(always)]
+    #[inline]
     fn mul_add(self, a: Self, b: Self) -> Self {
         self.mul_add(a, b)
-    }
-    #[doc(hidden)]
-    #[inline(always)]
-    fn gen<R: Rng + ?Sized>(rng: &mut R) -> Self {
-        rng.gen()
     }
 }
 
@@ -294,99 +295,94 @@ impl Float for f64 {
     type UInt = u64;
 
     #[doc(hidden)]
-    #[inline(always)]
+    #[inline]
     fn as_uint(self) -> Self::UInt {
         self as Self::UInt
     }
     #[doc(hidden)]
-    #[inline(always)]
+    #[inline]
     fn round_as_uint(self) -> Self::UInt {
         self.round() as Self::UInt
     }
     #[doc(hidden)]
-    #[inline(always)]
+    #[inline]
     fn cast_u32(u: u32) -> Self {
         u as Self
     }
     #[doc(hidden)]
-    #[inline(always)]
+    #[inline]
     fn cast_usize(u: usize) -> Self {
         u as Self
     }
     #[doc(hidden)]
-    #[inline(always)]
+    #[inline]
     fn cast_uint(u: Self::UInt) -> Self {
         u as Self
     }
     #[doc(hidden)]
-    #[inline(always)]
+    #[inline]
     fn from_bits(u: Self::UInt) -> Self {
         Self::from_bits(u)
     }
     #[doc(hidden)]
-    #[inline(always)]
+    #[inline]
     fn to_bits(self) -> Self::UInt {
         self.to_bits()
     }
     #[doc(hidden)]
-    #[inline(always)]
+    #[inline]
     fn min(self, other: Self) -> Self {
         self.min(other)
     }
     #[doc(hidden)]
-    #[inline(always)]
+    #[inline]
     fn max(self, other: Self) -> Self {
         self.max(other)
     }
     #[doc(hidden)]
-    #[inline(always)]
+    #[inline]
     fn abs(self) -> Self {
         self.abs()
     }
     #[doc(hidden)]
-    #[inline(always)]
+    #[inline]
     fn sqrt(self) -> Self {
         self.sqrt()
     }
     #[doc(hidden)]
-    #[inline(always)]
+    #[inline]
     fn ln(self) -> Self {
         self.ln()
     }
     #[doc(hidden)]
-    #[inline(always)]
+    #[inline]
     fn log2(self) -> Self {
         self.log2()
     }
     #[doc(hidden)]
-    #[inline(always)]
+    #[inline]
     fn exp(self) -> Self {
         self.exp()
     }
     #[doc(hidden)]
-    #[inline(always)]
+    #[inline]
     fn powf(self, exponent: Self) -> Self {
         self.powf(exponent)
     }
     #[doc(hidden)]
-    #[inline(always)]
+    #[inline]
     fn erf(self) -> Self {
         unsafe { cmath::erf(self) }
     }
     #[doc(hidden)]
-    #[inline(always)]
+    #[inline]
     fn erfc(self) -> Self {
         unsafe { cmath::erfc(self) }
     }
     #[doc(hidden)]
-    #[inline(always)]
+    #[inline]
     fn mul_add(self, a: Self, b: Self) -> Self {
         self.mul_add(a, b)
-    }
-    #[doc(hidden)]
-    #[inline(always)]
-    fn gen<R: Rng + ?Sized>(rng: &mut R) -> Self {
-        rng.gen()
     }
 }
 
@@ -401,7 +397,7 @@ pub trait Func<T> {
 }
 
 impl<T: Float, F: Fn(T) -> T> Func<T> for F {
-    #[inline(always)]
+    #[inline]
     fn eval(&self, x: T) -> T {
         (*self)(x)
     }
