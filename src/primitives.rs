@@ -1,7 +1,7 @@
 //! Primitive ETF distributions and related utilities.
 
 // Internal traits.
-use crate::num::{Float, Func, UInt};
+use crate::num::{Float, UInt};
 use partition::*;
 pub use table_validation::*;
 
@@ -13,6 +13,24 @@ use std::marker::PhantomData;
 pub mod partition;
 mod table_validation;
 pub mod util;
+
+/// A univariate function.
+///
+/// This trait is currently needed to work around the impossibility to implement
+/// the `Fn(T) -> T` trait for custom types, which in turn is useful if one
+/// wishes to parametrize the `Dist*` primitives with named function types
+/// rather than with closures (which are anonymous). It may be deprecated once
+/// [Fn traits](https://github.com/rust-lang/rust/issues/29625) are stabilized.
+pub trait Func<T> {
+    fn eval(&self, x: T) -> T;
+}
+
+impl<T: Float, F: Fn(T) -> T> Func<T> for F {
+    #[inline]
+    fn eval(&self, x: T) -> T {
+        (*self)(x)
+    }
+}
 
 /// Univariate probability distribution.
 pub trait Distribution<T> {
@@ -352,7 +370,6 @@ where
 
             // Use the leftmost bit as the IEEE sign bit.
             let s = (r >> (T::UInt::BITS - 1)) << (T::UInt::BITS - 1);
-            
             // Test for the common case (point below yinf).
             let d = &self.data.table[i];
             if u <= d.wedge_switch {
@@ -372,7 +389,6 @@ where
         }
     }
 }
-
 
 /// Distribution with symmetric probability density function and rejection-sampled tail.
 #[derive(Clone)]
@@ -427,7 +443,6 @@ where
 
             // Use the leftmost bit as the IEEE sign bit.
             let s = (r >> (T::UInt::BITS - 1)) << (T::UInt::BITS - 1);
-            
             // Test for the common case (point below yinf).
             let d = &self.data.table[i];
             if u <= d.wedge_switch {

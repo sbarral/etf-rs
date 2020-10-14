@@ -386,23 +386,6 @@ impl Float for f64 {
     }
 }
 
-/// A univariate function.
-///
-/// This trait is currently needed to work around the impossibility to
-/// implement the `Fn(T) -> T` trait for custom types. It may be deprecated
-/// once [Fn traits](https://github.com/rust-lang/rust/issues/29625) are
-/// stabilized.
-pub trait Func<T> {
-    fn eval(&self, x: T) -> T;
-}
-
-impl<T: Float, F: Fn(T) -> T> Func<T> for F {
-    #[inline]
-    fn eval(&self, x: T) -> T {
-        (*self)(x)
-    }
-}
-
 /// Prevent implementation of public traits to leave open the possibility to
 /// extend these traits in the future.
 mod private {

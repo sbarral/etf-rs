@@ -1,4 +1,4 @@
-use crate::num::{Float, Func};
+use crate::num::Float;
 use crate::primitives::*;
 use rand_core::RngCore;
 

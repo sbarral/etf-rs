@@ -1,7 +1,7 @@
 //! Utilites for ETF distributions generation. 
 
-use crate::num::{Float, Func};
-use super::{Envelope, InitTable, NodeArray, Partition};
+use crate::num::Float;
+use super::{Func, Envelope, InitTable, NodeArray, Partition};
 
 use rand_core::RngCore;
 
