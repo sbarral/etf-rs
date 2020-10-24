@@ -14,18 +14,36 @@ pub mod partition;
 mod table_validation;
 pub mod util;
 
-/// A univariate function.
+/// Univariate function.
 ///
-/// This trait is currently needed to work around the impossibility to implement
-/// the `Fn(T) -> T` trait for custom types, which in turn is useful if one
-/// wishes to parametrize the `Dist*` primitives with named function types
-/// rather than with closures (which are anonymous). It may be deprecated once
-/// [Fn traits](https://github.com/rust-lang/rust/issues/29625) are stabilized.
-pub trait Func<T> {
+/// This trait is automatically implemented for `Fn(T) -> T` types. It is mostly
+/// useful as a way to work around the current impossibility to implement the
+/// `Fn(T) -> T` trait for custom functor types (see
+/// [this issue](https://github.com/rust-lang/rust/issues/29625)),
+/// but also provides an optimization opportunity for the implementations of the
+/// wedge acceptance-rejection test.
+///
+pub trait UnivariateFn<T: Float> {
+    /// Evaluates the function at `x`.
     fn eval(&self, x: T) -> T;
+
+    /// Tests the inequality `a * f(x) > b` where `a` and `b` are strictly
+    /// positive.
+    ///
+    /// This function has a trivial default implementation, which can be
+    /// overridden with an optimized implementation. For instance, if the
+    /// probability distribution function is of the form `f(x) = 1/g(x)`, the
+    /// default implementation can be replaced by the faster division-less test
+    /// `a > b * g(x)`; similarly, a faster implementation may exist when the
+    /// evaluation of the inverse function `f⁻¹` is less expensive than that of
+    /// `f`.
+    #[inline]
+    fn test(&self, x: T, a: T, b: T) -> bool {
+        a * self.eval(x) > b
+    }
 }
 
-impl<T: Float, F: Fn(T) -> T> Func<T> for F {
+impl<T: Float, F: Fn(T) -> T> UnivariateFn<T> for F {
     #[inline]
     fn eval(&self, x: T) -> T {
         (*self)(x)
@@ -56,7 +74,7 @@ impl<P, T, F> DistAny<P, T, F>
 where
     P: ValidPartitionSize<T>,
     T: Float,
-    F: Func<T>,
+    F: UnivariateFn<T>,
 {
     pub fn new(func: F, table: &InitTable<P, T>) -> Self {
         DistAny {
@@ -71,7 +89,7 @@ impl<P, T, F> Distribution<T> for DistAny<P, T, F>
 where
     P: Partition,
     T: Float,
-    F: Func<T>,
+    F: UnivariateFn<T>,
 {
     #[inline]
     fn sample<R: RngCore + ?Sized>(&self, rng: &mut R) -> T {
@@ -97,14 +115,17 @@ where
             // Wedge sampling, test y<f(x).
             let dx = self.data.table[i + 1].beta - d.beta;
             let x = d.beta + T::gen(rng) * dx;
-            if T::cast_uint(u) * self.data.scaled_xysup < self.func.eval(x) * dx {
+            if self
+                .func
+                .test(x, dx, T::cast_uint(u) * self.data.scaled_xysup)
+            {
                 return x;
             }
         }
     }
 }
 
-/// Distribution with rejection-sampled tail.
+/// Distribution with rejection-sampled tail(s).
 #[derive(Clone)]
 pub struct DistAnyTailed<P, T: Float, F, E> {
     data: Data<T>,
@@ -118,7 +139,7 @@ impl<P, T, F, E> DistAnyTailed<P, T, F, E>
 where
     P: ValidPartitionSize<T>,
     T: Float,
-    F: Func<T>,
+    F: UnivariateFn<T>,
     E: Envelope<T>,
 {
     pub fn new(func: F, table: &InitTable<P, T>, tail_envelope: E, tail_area: T) -> Self {
@@ -138,7 +159,7 @@ impl<P, T, F, E> Distribution<T> for DistAnyTailed<P, T, F, E>
 where
     P: Partition,
     T: Float,
-    F: Func<T>,
+    F: UnivariateFn<T>,
     E: Envelope<T>,
 {
     #[inline]
@@ -173,7 +194,10 @@ where
             // Wedge sampling, test y<f(x).
             let dx = self.data.table[i + 1].beta - d.beta;
             let x = d.beta + T::gen(rng) * dx;
-            if T::cast_uint(u) * self.data.scaled_xysup < self.func.eval(x) * dx {
+            if self
+                .func
+                .test(x, dx, T::cast_uint(u) * self.data.scaled_xysup)
+            {
                 return x;
             }
         }
@@ -193,7 +217,7 @@ impl<P, T, F> DistCentral<P, T, F>
 where
     P: ValidSymmetricPartitionSize<T>,
     T: Float,
-    F: Func<T>,
+    F: UnivariateFn<T>,
 {
     pub fn new(func: F, table: &InitTable<P, T>) -> Self {
         DistCentral {
@@ -208,7 +232,7 @@ impl<P, T, F> Distribution<T> for DistCentral<P, T, F>
 where
     P: Partition,
     T: Float,
-    F: Func<T>,
+    F: UnivariateFn<T>,
 {
     #[inline]
     fn sample<R: RngCore + ?Sized>(&self, rng: &mut R) -> T {
@@ -238,7 +262,10 @@ where
             // Wedge sampling, test y<f(x).
             let dx = self.data.table[i + 1].beta - d.beta;
             let x = d.beta + T::gen(rng) * dx;
-            if T::cast_uint(u) * self.data.scaled_xysup < self.func.eval(x) * dx {
+            if self
+                .func
+                .test(x, dx, T::cast_uint(u) * self.data.scaled_xysup)
+            {
                 return T::bitxor(x, s);
             }
         }
@@ -246,7 +273,7 @@ where
 }
 
 /// Distribution with symmetric probability density function about the origin
-/// and rejection-sampled tail.
+/// and rejection-sampled tail(s).
 #[derive(Clone)]
 pub struct DistCentralTailed<P, T: Float, F, E> {
     data: Data<T>,
@@ -260,7 +287,7 @@ impl<P, T, F, E> DistCentralTailed<P, T, F, E>
 where
     P: ValidSymmetricPartitionSize<T>,
     T: Float,
-    F: Func<T>,
+    F: UnivariateFn<T>,
     E: Envelope<T>,
 {
     pub fn new(func: F, table: &InitTable<P, T>, tail_envelope: E, tail_area: T) -> Self {
@@ -279,7 +306,7 @@ impl<P, T, F, E> Distribution<T> for DistCentralTailed<P, T, F, E>
 where
     P: Partition,
     T: Float,
-    F: Func<T>,
+    F: UnivariateFn<T>,
     E: Envelope<T>,
 {
     #[inline]
@@ -318,7 +345,10 @@ where
             // Wedge sampling, test y<f(x).
             let dx = self.data.table[i + 1].beta - d.beta;
             let x = d.beta + T::gen(rng) * dx;
-            if T::cast_uint(u) * self.data.scaled_xysup < self.func.eval(x) * dx {
+            if self
+                .func
+                .test(x, dx, T::cast_uint(u) * self.data.scaled_xysup)
+            {
                 return T::bitxor(x, s);
             }
         }
@@ -338,7 +368,7 @@ impl<P, T, F> DistSymmetric<P, T, F>
 where
     P: ValidSymmetricPartitionSize<T>,
     T: Float,
-    F: Func<T>,
+    F: UnivariateFn<T>,
 {
     pub fn new(x0: T, func: F, table: &InitTable<P, T>) -> Self {
         DistSymmetric {
@@ -354,7 +384,7 @@ impl<P, T, F> Distribution<T> for DistSymmetric<P, T, F>
 where
     P: Partition,
     T: Float,
-    F: Func<T>,
+    F: UnivariateFn<T>,
 {
     #[inline]
     fn sample<R: RngCore + ?Sized>(&self, rng: &mut R) -> T {
@@ -383,14 +413,18 @@ where
             // Wedge sampling, test y<f(x).
             let dx = self.data.table[i + 1].beta - d.beta;
             let delta_x = d.beta + T::gen(rng) * dx;
-            if T::cast_uint(u) * self.data.scaled_xysup < self.func.eval(self.x0 + delta_x) * dx {
+            if self.func.test(
+                self.x0 + delta_x,
+                dx,
+                T::cast_uint(u) * self.data.scaled_xysup,
+            ) {
                 return self.x0 + T::bitxor(delta_x, s);
             }
         }
     }
 }
 
-/// Distribution with symmetric probability density function and rejection-sampled tail.
+/// Distribution with symmetric probability density function and rejection-sampled tail(s).
 #[derive(Clone)]
 pub struct DistSymmetricTailed<P, T: Float, F, E> {
     data: Data<T>,
@@ -405,7 +439,7 @@ impl<P, T, F, E> DistSymmetricTailed<P, T, F, E>
 where
     P: ValidSymmetricPartitionSize<T>,
     T: Float,
-    F: Func<T>,
+    F: UnivariateFn<T>,
     E: Envelope<T>,
 {
     pub fn new(x0: T, func: F, table: &InitTable<P, T>, tail_envelope: E, tail_area: T) -> Self {
@@ -426,7 +460,7 @@ impl<P, T, F, E> Distribution<T> for DistSymmetricTailed<P, T, F, E>
 where
     P: Partition,
     T: Float,
-    F: Func<T>,
+    F: UnivariateFn<T>,
     E: Envelope<T>,
 {
     #[inline]
@@ -464,7 +498,11 @@ where
             // Wedge sampling, test y<f(x).
             let dx = self.data.table[i + 1].beta - d.beta;
             let delta_x = d.beta + T::gen(rng) * dx;
-            if T::cast_uint(u) * self.data.scaled_xysup < self.func.eval(self.x0 + delta_x) * dx {
+            if self.func.test(
+                self.x0 + delta_x,
+                dx,
+                T::cast_uint(u) * self.data.scaled_xysup,
+            ) {
                 return self.x0 + T::bitxor(delta_x, s);
             }
         }

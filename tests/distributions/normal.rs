@@ -1,6 +1,4 @@
-mod common;
-
-use common::{collisions, goodness_of_fit};
+use crate::common::{collisions, goodness_of_fit};
 use etf::distributions::{Normal, CentralNormal};
 use etf::num::Float;
 

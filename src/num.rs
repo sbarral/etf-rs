@@ -1,9 +1,10 @@
+//! Numeric types.
+
 use rand_core::RngCore;
-use std;
-use std::cmp::Ord;
 use std::fmt::{Debug, Display};
 use std::ops::{
-    Add, AddAssign, BitAnd, BitOr, BitXor, Div, DivAssign, Mul, MulAssign, Neg, Shl, Shr, Sub, SubAssign,
+    Add, AddAssign, BitAnd, BitOr, BitXor, Div, DivAssign, Mul, MulAssign, Neg, Shl, Shr, Sub,
+    SubAssign,
 };
 
 /// An unsigned integer type.
@@ -11,8 +12,10 @@ pub trait UInt:
     private::Sealed
     + Copy
     + Clone
+    + Default
     + Debug
     + Display
+    + Ord
     + Add<Output = Self>
     + Sub<Output = Self>
     + Mul<Output = Self>
@@ -26,7 +29,6 @@ pub trait UInt:
     + SubAssign
     + MulAssign
     + DivAssign
-    + Ord
 {
     #[doc(hidden)]
     const BITS: u32;
@@ -93,7 +95,11 @@ pub trait Float:
     private::Sealed
     + Copy
     + Clone
+    + Default
     + Debug
+    + Display
+    + PartialOrd
+    + From<f32>
     + Add<Output = Self>
     + Sub<Output = Self>
     + Mul<Output = Self>
@@ -103,9 +109,6 @@ pub trait Float:
     + SubAssign
     + MulAssign
     + DivAssign
-    + PartialOrd
-    + From<f32>
-    + Display
 {
     #[doc(hidden)]
     const SIGNIFICAND_BITS: u32;
@@ -148,6 +151,10 @@ pub trait Float:
     fn abs(self) -> Self;
     #[doc(hidden)]
     fn sqrt(self) -> Self;
+    #[doc(hidden)]
+    fn tan(self) -> Self;
+    #[doc(hidden)]
+    fn atan(self) -> Self;
     #[doc(hidden)]
     fn ln(self) -> Self;
     #[doc(hidden)]
@@ -241,6 +248,16 @@ impl Float for f32 {
     #[inline]
     fn sqrt(self) -> Self {
         self.sqrt()
+    }
+    #[doc(hidden)]
+    #[inline]
+    fn tan(self) -> Self {
+        self.tan()
+    }
+    #[doc(hidden)]
+    #[inline]
+    fn atan(self) -> Self {
+        self.atan()
     }
     #[doc(hidden)]
     #[inline]
@@ -348,6 +365,16 @@ impl Float for f64 {
     #[inline]
     fn sqrt(self) -> Self {
         self.sqrt()
+    }
+    #[doc(hidden)]
+    #[inline]
+    fn tan(self) -> Self {
+        self.tan()
+    }
+    #[doc(hidden)]
+    #[inline]
+    fn atan(self) -> Self {
+        self.atan()
     }
     #[doc(hidden)]
     #[inline]

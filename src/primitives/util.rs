@@ -1,7 +1,7 @@
 //! Utilites for ETF distributions generation. 
 
 use crate::num::Float;
-use super::{Func, Envelope, InitTable, NodeArray, Partition};
+use super::{UnivariateFn, Envelope, InitTable, NodeArray, Partition};
 
 use rand_core::RngCore;
 
@@ -44,7 +44,7 @@ pub fn midpoint_prepartition<P, T, F>(f: &F, x0: T, x1: T, m: usize) -> NodeArra
 where
     P: Partition,
     T: Float,
-    F: Func<T>,
+    F: UnivariateFn<T>,
 {
     // constants.
     let one_half = T::ONE / (T::ONE + T::ONE);
@@ -105,6 +105,14 @@ where
 /// not reached after the specified maximum number of iterations, a
 /// `TabulationError` is returned.
 ///
+/// It must be noted that the accuracy of the distribution sampling process
+/// itself is not affected by the tabulation tolerance: this tolerance only
+/// impacts the wedge sampling rate (i.e. how often a top floor is tested) and
+/// thus the average sampling speed. A tolerance of the order of 0.001 will
+/// often constitute a suitable compromise as it will at worse increase the
+/// wedge sampling rate by 0.1% while being less likely to cause spurious
+/// convergence failures than tighter tolerances.
+///
 /// A relaxation coefficient lower than 1 (resp. greater than 1) may be
 /// specified to improve convergence robustness (resp. speed).
 pub fn newton_tabulation<P, T, F, DF>(
@@ -119,8 +127,8 @@ pub fn newton_tabulation<P, T, F, DF>(
 where
     P: Partition,
     T: Float,
-    F: Func<T>,
-    DF: Func<T>,
+    F: UnivariateFn<T>,
+    DF: UnivariateFn<T>,
 {
     // Initialize the quadrature table partition with the initial partition.
     let mut table = InitTable::new();
@@ -342,7 +350,7 @@ pub struct WeibullEnvelope<T, F> {
     f: F,
 }
 
-impl<T: Float, F: Func<T>> WeibullEnvelope<T, F> {
+impl<T: Float, F: UnivariateFn<T>> WeibullEnvelope<T, F> {
     /// Creates a new Weibull tail envelope distribution for a given probability
     /// density function.
     ///
@@ -373,7 +381,7 @@ impl<T: Float, F: Func<T>> WeibullEnvelope<T, F> {
     }
 }
 
-impl<T: Float, F: Func<T>> Envelope<T> for WeibullEnvelope<T, F> {
+impl<T: Float, F: UnivariateFn<T>> Envelope<T> for WeibullEnvelope<T, F> {
     fn try_sample<R: RngCore + ?Sized>(&self, rng: &mut R) -> Option<T> {
         let r = T::gen(rng);
         let x = self.c + self.b * T::powf(self.alpha - T::ln(T::ONE - r), self.inv_a);

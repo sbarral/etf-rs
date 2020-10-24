@@ -5,12 +5,12 @@ use rand_core::RngCore;
 /// Non-normalized normal probability distribution function with arbitrary mean
 /// and standard deviation.
 #[derive(Copy, Clone, Debug)]
-struct NormalPdf<T> {
+struct UnscaledNormalPdf<T> {
     mean: T,
-    alpha: T,
+    alpha: T, // -1/(2*std_dev^2)
 }
 
-impl<T: Float> Func<T> for NormalPdf<T> {
+impl<T: Float> UnivariateFn<T> for UnscaledNormalPdf<T> {
     #[inline(always)]
     fn eval(&self, x: T) -> T {
         let dx = x - self.mean;
@@ -22,11 +22,11 @@ impl<T: Float> Func<T> for NormalPdf<T> {
 /// Non-normalized central normal probability distribution function with
 /// arbitrary standard deviation.
 #[derive(Copy, Clone, Debug)]
-struct CentralNormalPdf<T> {
+struct UnscaledCentralNormalPdf<T> {
     alpha: T,
 }
 
-impl<T: Float> Func<T> for CentralNormalPdf<T> {
+impl<T: Float> UnivariateFn<T> for UnscaledCentralNormalPdf<T> {
     #[inline(always)]
     fn eval(&self, x: T) -> T {
         (self.alpha * x * x).exp()
@@ -90,22 +90,16 @@ impl NormalFloat for f64 {
     const TAIL_POS: Self = 3.25;
 }
 
-fn new_normal<T: Float + NormalFloat, F: Func<T>, DF: Func<T>>(
+fn normal_parts<T: NormalFloat, F: UnivariateFn<T>, DF: UnivariateFn<T>>(
     mean: T,
     std_dev: T,
     pdf: F,
     dpdf: DF,
-) -> (
-    partition::InitTable<T::P, T>,
-    NormalTailEnvelope<T>,
-    T,
-) {
+) -> (partition::InitTable<T::P, T>, NormalTailEnvelope<T>, T) {
     let tail_position = mean + T::TAIL_POS * std_dev;
 
-    let one_half_sqrt_pi = T::from(0.5f32) * T::PI.sqrt();
-    let sigma_sqrt_two = std_dev * T::from(2f32).sqrt();
-    let tail_area =
-        one_half_sqrt_pi * sigma_sqrt_two * ((tail_position - mean) / sigma_sqrt_two).erfc();
+    let inv_sqrt_two = T::from(0.5f32).sqrt();
+    let tail_area = T::PI.sqrt() * std_dev * inv_sqrt_two * (T::TAIL_POS * inv_sqrt_two).erfc();
 
     // Build the distribution.
     let init_nodes = util::midpoint_prepartition(&pdf, mean, tail_position, 0);
@@ -116,22 +110,21 @@ fn new_normal<T: Float + NormalFloat, F: Func<T>, DF: Func<T>>(
     (table, tail_func, tail_area)
 }
 
-/// Normal distribution with arbitrary mean and standard deviation.
-pub struct Normal<T: Float + NormalFloat> {
-    inner: DistSymmetricTailed<T::P, T, NormalPdf<T>, NormalTailEnvelope<T>>,
+/// Normal distribution with arbitrary mean and arbitrary standard deviation.
+pub struct Normal<T: NormalFloat> {
+    inner: DistSymmetricTailed<T::P, T, UnscaledNormalPdf<T>, NormalTailEnvelope<T>>,
 }
 
-impl<T: Float + NormalFloat> Normal<T> {
+impl<T: NormalFloat> Normal<T> {
     pub fn new(mean: T, std_dev: T) -> Self {
         let two_alpha = -T::ONE / (std_dev * std_dev);
         let alpha = T::from(0.5_f32) * two_alpha;
-        let pdf = NormalPdf { mean, alpha };
+        let pdf = UnscaledNormalPdf { mean, alpha };
         let dpdf = move |x: T| {
             let dx = x - mean;
             dx * two_alpha * (dx * dx * alpha).exp()
         };
-    
-        let (table, tail_func, tail_area) = new_normal(mean, std_dev, pdf, dpdf);
+        let (table, tail_func, tail_area) = normal_parts(mean, std_dev, pdf, dpdf);
 
         Self {
             inner: DistSymmetricTailed::new(mean, pdf, &table, tail_func, tail_area),
@@ -139,7 +132,7 @@ impl<T: Float + NormalFloat> Normal<T> {
     }
 }
 
-impl<T: Float + NormalFloat> Distribution<T> for Normal<T> {
+impl<T: NormalFloat> Distribution<T> for Normal<T> {
     #[inline(always)]
     fn sample<R: RngCore + ?Sized>(&self, rng: &mut R) -> T {
         self.inner.sample(rng)
@@ -147,28 +140,24 @@ impl<T: Float + NormalFloat> Distribution<T> for Normal<T> {
 }
 
 /// Central normal distribution with arbitrary standard deviation.
-pub struct CentralNormal<T: Float + NormalFloat> {
-    inner: DistCentralTailed<T::P, T, CentralNormalPdf<T>, NormalTailEnvelope<T>>,
+pub struct CentralNormal<T: NormalFloat> {
+    inner: DistCentralTailed<T::P, T, UnscaledCentralNormalPdf<T>, NormalTailEnvelope<T>>,
 }
 
-impl<T: Float + NormalFloat> CentralNormal<T> {
+impl<T: NormalFloat> CentralNormal<T> {
     pub fn new(std_dev: T) -> Self {
         let two_alpha = -T::ONE / (std_dev * std_dev);
         let alpha = T::from(0.5_f32) * two_alpha;
-        let pdf = CentralNormalPdf { alpha };
-        let dpdf = move |x: T| {
-            x * two_alpha * (x * x * alpha).exp()
-        };
-    
-        let (table, tail_func, tail_area) = new_normal(T::ZERO, std_dev, pdf, dpdf);
-        
+        let pdf = UnscaledCentralNormalPdf { alpha };
+        let dpdf = move |x: T| x * two_alpha * (x * x * alpha).exp();
+        let (table, tail_func, tail_area) = normal_parts(T::ZERO, std_dev, pdf, dpdf);
         Self {
             inner: DistCentralTailed::new(pdf, &table, tail_func, tail_area),
         }
     }
 }
 
-impl<T: Float + NormalFloat> Distribution<T> for CentralNormal<T> {
+impl<T: NormalFloat> Distribution<T> for CentralNormal<T> {
     #[inline(always)]
     fn sample<R: RngCore + ?Sized>(&self, rng: &mut R) -> T {
         self.inner.sample(rng)
