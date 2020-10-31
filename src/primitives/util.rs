@@ -1,7 +1,7 @@
-//! Utilites for ETF distributions generation. 
+//! Utilites for ETF distributions generation.
 
+use super::{Envelope, InitTable, NodeArray, Partition, UnivariateFn};
 use crate::num::Float;
-use super::{UnivariateFn, Envelope, InitTable, NodeArray, Partition};
 
 use rand_core::RngCore;
 
@@ -89,8 +89,9 @@ where
 
 /// Computes a distribution initialization table using Newton's method.
 ///
-/// A multivariate Newton method is used to compute a partition such that the
-/// rectangles making up an upper Riemann sum of function `f` have equal areas.
+/// The multivariate Newton's method is used to compute a partition such that
+/// the rectangles making up an upper Riemann sum of function `f` have equal
+/// areas.
 ///
 /// If successful, the returned table contains the partition as well as the
 /// extrema of the function over each sub-interval.
@@ -106,12 +107,12 @@ where
 /// `TabulationError` is returned.
 ///
 /// It must be noted that the accuracy of the distribution sampling process
-/// itself is not affected by the tabulation tolerance: this tolerance only
-/// impacts the wedge sampling rate (i.e. how often a top floor is tested) and
-/// thus the average sampling speed. A tolerance of the order of 0.001 will
+/// itself will not be affected by the tabulation tolerance: this tolerance will
+/// only impacts the wedge sampling rate (i.e. how often a top floor is tested)
+/// and thus the average sampling speed. A tolerance of the order of 0.001 will
 /// often constitute a suitable compromise as it will at worse increase the
-/// wedge sampling rate by 0.1% while being less likely to cause spurious
-/// convergence failures than tighter tolerances.
+/// wedge sampling rate by 0.1% while mitigating the risk of spurious
+/// convergence failures.
 ///
 /// A relaxation coefficient lower than 1 (resp. greater than 1) may be
 /// specified to improve convergence robustness (resp. speed).
@@ -220,15 +221,14 @@ where
         let mean_area = sum_area / T::cast_usize(n);
 
         if (max_area - min_area) < tolerance * mean_area {
-            // At this point the areas differ slightly, which would introduce
-            // some bias when the partitions are sampled as the assumption of
-            // equiprobability would be violated.
+            // At this point the areas are likely to differ slightly due to
+            // roundoff errors, which would introduce some bias when the
+            // partitions are sampled.
             //
             // A simple way to cancel this bias is to slightly increase the
             // `ysup` values so as to make all areas equal to `max_area`. This
             // makes the top-floor rejection slightly suboptimal, but the loss
-            // of efficiency is unlikely to be noticeable for reasonable values
-            // of the tolerance.
+            // of efficiency is unlikely to be noticeable.
             for i in 0..n {
                 ysup[i] = max_area / (x[i + 1] - x[i]).abs();
             }
@@ -259,11 +259,11 @@ where
         }
 
         // Exit if convergence could not be achieved.
-        if loop_iter.next().is_none() {
+        if loop_iter.next().is_none() || mean_area.is_nan() {
             return Err(TabulationError::new(max_iter));
         }
 
-        // Difference in area between neigboring rectangles and partial
+        // Difference in area between neighboring rectangles and partial
         // derivatives of s with respect to x[i], x[i+1] and x[i+2].
         for i in 0..(n - 1) {
             minus_s[i] = ysup[i] * (x[i + 1] - x[i]) - ysup[i + 1] * (x[i + 2] - x[i + 1]);

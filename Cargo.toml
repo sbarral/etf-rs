@@ -5,7 +5,7 @@ authors = ["Serge Barral <serge@fi3k-barral.com>"]
 edition = "2018"
 
 [features]
-# Use fused multiply-add (may be slower, even if supported by the target arch).
+# Use fused multiply-add (may actually be slower, even if supported by the target arch).
 fma = []
 
 [dev-dependencies]
@@ -19,10 +19,7 @@ criterion = "0.3"
 rand_core = "0.5"
 
 [profile.release]
-# Unless LTO is used, for some weird reason the inclusion of rand_core as an
-# explicit dependency impacts the performance even if it is not used directly
-# (i.e. even if ETF uses the Rng trait from rand rather than the RngCore trait).
-lto = true
+#lto = true
 
 [[bench]]
 name = "benchmark"

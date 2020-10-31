@@ -44,6 +44,9 @@ pub trait UInt:
 
     #[doc(hidden)]
     fn as_usize(self) -> usize;
+
+    #[doc(hidden)]
+    fn arithmetic_right_shift(self, shift: u32) -> Self;
 }
 
 impl UInt for u32 {
@@ -66,6 +69,11 @@ impl UInt for u32 {
     fn as_usize(self) -> usize {
         self as usize
     }
+    #[doc(hidden)]
+    #[inline]
+    fn arithmetic_right_shift(self, shift: u32) -> Self {
+        ((self as i32) >> shift) as u32
+    }
 }
 
 impl UInt for u64 {
@@ -87,6 +95,11 @@ impl UInt for u64 {
     #[inline]
     fn as_usize(self) -> usize {
         self as usize
+    }
+    #[doc(hidden)]
+    #[inline]
+    fn arithmetic_right_shift(self, shift: u32) -> Self {
+        ((self as i64) >> shift) as u64
     }
 }
 
@@ -169,6 +182,8 @@ pub trait Float:
     fn erfc(self) -> Self;
     #[doc(hidden)]
     fn mul_add(self, a: Self, b: Self) -> Self;
+    #[doc(hidden)]
+    fn is_nan(self) -> bool;
     #[doc(hidden)]
     #[inline]
     fn gen<R: RngCore + ?Sized>(rng: &mut R) -> Self {
@@ -291,6 +306,11 @@ impl Float for f32 {
     }
     #[doc(hidden)]
     #[inline]
+    fn is_nan(self) -> bool {
+        self.is_nan()
+    }
+    #[doc(hidden)]
+    #[inline]
     fn mul_add(self, a: Self, b: Self) -> Self {
         self.mul_add(a, b)
     }
@@ -405,6 +425,11 @@ impl Float for f64 {
     #[inline]
     fn erfc(self) -> Self {
         unsafe { cmath::erfc(self) }
+    }
+    #[doc(hidden)]
+    #[inline]
+    fn is_nan(self) -> bool {
+        self.is_nan()
     }
     #[doc(hidden)]
     #[inline]

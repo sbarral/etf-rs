@@ -8,7 +8,7 @@ pub fn normal_cdf(x: f64, mean: f64, std_dev: f64) -> f64 {
 }
 
 #[test]
-fn normal_collisions_f32() {
+fn normal_32_collisions() {
     let mean = -1.7_f64;
     let std_dev = 2.8_f64;
 
@@ -24,7 +24,7 @@ fn normal_collisions_f32() {
 
 
 #[test]
-fn normal_collisions_f64() {
+fn normal_64_collisions() {
     let mean = -1.7_f64;
     let std_dev = 2.8_f64;
 
@@ -39,7 +39,7 @@ fn normal_collisions_f64() {
 }
 
 #[test]
-fn central_normal_collisions_f32() {
+fn central_normal_32_collisions() {
     let std_dev = 0.7_f64;
 
     collisions(
@@ -53,7 +53,7 @@ fn central_normal_collisions_f32() {
 }
 
 #[test]
-fn central_normal_collisions_f64() {
+fn central_normal_64_collisions() {
     let std_dev = 0.7_f64;
 
     collisions(
@@ -67,7 +67,7 @@ fn central_normal_collisions_f64() {
 }
 
 #[test]
-fn normal_fit_f32() {
+fn normal_32_fit() {
     let mean = 2.2_f64;
     let std_dev = 3.4_f64;
     let n_sigma = 4.0_f64; // test interval half-width in standard deviation units
@@ -84,7 +84,7 @@ fn normal_fit_f32() {
 }
 
 #[test]
-fn normal_fit_f64() {
+fn normal_64_fit() {
     let mean = 2.2_f64;
     let std_dev = 3.4_f64;
     let n_sigma = 4.0_f64; // test interval half-width in std. dev. units
@@ -101,7 +101,7 @@ fn normal_fit_f64() {
 }
 
 #[test]
-fn central_normal_fit_f32() {
+fn central_normal_32_fit() {
     let std_dev = 1.3_f64;
     let n_sigma = 4.0_f64; // test interval half-width in standard deviation units
 
@@ -117,7 +117,7 @@ fn central_normal_fit_f32() {
 }
 
 #[test]
-fn central_normal_fit_f64() {
+fn central_normal_64_fit() {
     let std_dev = 1.3_f64;
     let n_sigma = 4.0_f64; // test interval half-width in std. dev. units
 

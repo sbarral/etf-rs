@@ -93,13 +93,17 @@ where
 {
     #[inline]
     fn sample<R: RngCore + ?Sized>(&self, rng: &mut R) -> T {
+        let u_mask = (T::UInt::ONE << (T::UInt::BITS - P::BITS )) - T::UInt::ONE;
+
         loop {
+
             let r = T::UInt::gen(rng);
 
             // Extract the significand from the rightmost bits.
-            let u = r << P::BITS;
+            let u = r & u_mask;
 
-            // Extract the table index from the P::BITS leftmost bits.
+            // Extract the table index from the P::BITS leftmost bits after the
+            // sign bit.
             let i = (r >> (T::UInt::BITS - P::BITS)).as_usize();
 
             // Test for the common case (point below yinf).
@@ -164,13 +168,17 @@ where
 {
     #[inline]
     fn sample<R: RngCore + ?Sized>(&self, rng: &mut R) -> T {
+        let u_mask = (T::UInt::ONE << (T::UInt::BITS - P::BITS )) - T::UInt::ONE;
+
         loop {
+
             let r = T::UInt::gen(rng);
 
             // Extract the significand from the rightmost bits.
-            let u = r << P::BITS;
+            let u = r & u_mask;
 
-            // Extract the table index from the P::BITS leftmost bits.
+            // Extract the table index from the P::BITS leftmost bits after the
+            // sign bit.
             let i = (r >> (T::UInt::BITS - P::BITS)).as_usize();
 
             // Test for the common case (point below yinf).
@@ -236,18 +244,24 @@ where
 {
     #[inline]
     fn sample<R: RngCore + ?Sized>(&self, rng: &mut R) -> T {
+        let u_mask = (T::UInt::ONE << (T::UInt::BITS - P::BITS - 1)) - T::UInt::ONE;
+        let i_mask = (T::UInt::ONE << P::BITS) - T::UInt::ONE;
+        let s_mask = T::UInt::ONE << (T::UInt::BITS - 1);
+
         loop {
-            let r = T::UInt::gen(rng);
+
+            let mut r = T::UInt::gen(rng);
 
             // Extract the significand from the rightmost bits.
-            let u = r << (1 + P::BITS);
+            let u = r & u_mask;
 
             // Extract the table index from the P::BITS leftmost bits after the
             // sign bit.
-            let i = ((r << 1) >> (T::UInt::BITS - P::BITS)).as_usize();
+            r = r.arithmetic_right_shift(T::UInt::BITS - P::BITS - 1);
+            let i = (r & i_mask).as_usize();
 
             // Use the leftmost bit as the IEEE sign bit.
-            let s = (r >> (T::UInt::BITS - 1)) << (T::UInt::BITS - 1);
+            let s = r & s_mask;
 
             // Test for the common case (point below yinf).
             let d = &self.data.table[i];
@@ -311,18 +325,24 @@ where
 {
     #[inline]
     fn sample<R: RngCore + ?Sized>(&self, rng: &mut R) -> T {
+        let u_mask = (T::UInt::ONE << (T::UInt::BITS - P::BITS - 1)) - T::UInt::ONE;
+        let i_mask = (T::UInt::ONE << P::BITS) - T::UInt::ONE;
+        let s_mask = T::UInt::ONE << (T::UInt::BITS - 1);
+
         loop {
-            let r = T::UInt::gen(rng);
+
+            let mut r = T::UInt::gen(rng);
 
             // Extract the significand from the rightmost bits.
-            let u = r << (1 + P::BITS);
+            let u = r & u_mask;
 
             // Extract the table index from the P::BITS leftmost bits after the
             // sign bit.
-            let i = ((r << 1) >> (T::UInt::BITS - P::BITS)).as_usize();
+            r = r.arithmetic_right_shift(T::UInt::BITS - P::BITS - 1);
+            let i = (r & i_mask).as_usize();
 
             // Use the leftmost bit as the IEEE sign bit.
-            let s = (r >> (T::UInt::BITS - 1)) << (T::UInt::BITS - 1);
+            let s = r & s_mask;
 
             // Test for the common case (point below yinf).
             let d = &self.data.table[i];
@@ -388,18 +408,25 @@ where
 {
     #[inline]
     fn sample<R: RngCore + ?Sized>(&self, rng: &mut R) -> T {
+        let u_mask = (T::UInt::ONE << (T::UInt::BITS - P::BITS - 1)) - T::UInt::ONE;
+        let i_mask = (T::UInt::ONE << P::BITS) - T::UInt::ONE;
+        let s_mask = T::UInt::ONE << (T::UInt::BITS - 1);
+
         loop {
-            let r = T::UInt::gen(rng);
+
+            let mut r = T::UInt::gen(rng);
 
             // Extract the significand from the rightmost bits.
-            let u = r << (1 + P::BITS);
+            let u = r & u_mask;
 
             // Extract the table index from the P::BITS leftmost bits after the
             // sign bit.
-            let i = ((r << 1) >> (T::UInt::BITS - P::BITS)).as_usize();
+            r = r.arithmetic_right_shift(T::UInt::BITS - P::BITS - 1);
+            let i = (r & i_mask).as_usize();
 
             // Use the leftmost bit as the IEEE sign bit.
-            let s = (r >> (T::UInt::BITS - 1)) << (T::UInt::BITS - 1);
+            let s = r & s_mask;
+
             // Test for the common case (point below yinf).
             let d = &self.data.table[i];
             if u <= d.wedge_switch {
@@ -465,18 +492,25 @@ where
 {
     #[inline]
     fn sample<R: RngCore + ?Sized>(&self, rng: &mut R) -> T {
+        let u_mask = (T::UInt::ONE << (T::UInt::BITS - P::BITS - 1)) - T::UInt::ONE;
+        let i_mask = (T::UInt::ONE << P::BITS) - T::UInt::ONE;
+        let s_mask = T::UInt::ONE << (T::UInt::BITS - 1);
+
         loop {
-            let r = T::UInt::gen(rng);
+
+            let mut r = T::UInt::gen(rng);
 
             // Extract the significand from the rightmost bits.
-            let u = r << (1 + P::BITS);
+            let u = r & u_mask;
 
             // Extract the table index from the P::BITS leftmost bits after the
             // sign bit.
-            let i = ((r << 1) >> (T::UInt::BITS - P::BITS)).as_usize();
+            r = r.arithmetic_right_shift(T::UInt::BITS - P::BITS - 1);
+            let i = (r & i_mask).as_usize();
 
             // Use the leftmost bit as the IEEE sign bit.
-            let s = (r >> (T::UInt::BITS - 1)) << (T::UInt::BITS - 1);
+            let s = r & s_mask;
+
             // Test for the common case (point below yinf).
             let d = &self.data.table[i];
             if u <= d.wedge_switch {
@@ -510,6 +544,7 @@ where
 }
 
 // Distribution table datum.
+#[repr(C)]
 #[derive(Copy, Clone)]
 struct TableDatum<T: Float> {
     alpha: T,              // (x[i+1] - x[i]) / wedge_switch[i]
@@ -551,7 +586,7 @@ where
         let bit_loss = T::cast_u32(T::SIGNIFICAND_BITS) - w.log2();
         let (wedge_switch, alpha) = if bit_loss <= max_bit_loss {
             // Coefficients for the baseline sampling algorithm.
-            (round_as_uint_saturating(w), (x[i + 1] - x[i]) / w)
+            (w.round_as_uint(), (x[i + 1] - x[i]) / w)
         } else {
             // Degraded case: force wedge sampling algorithm.
             (T::UInt::ZERO, T::ZERO)
@@ -594,15 +629,8 @@ where
     for i in 0..P::SIZE {
         area = area + (x[i + 1] - x[i]) * ysup[i];
     }
-    let switch = T::cast_uint(T::UInt::MAX) * (area / (area + tail_area));
-
-    round_as_uint_saturating(switch)
+    let max_switch = T::cast_uint((T::UInt::ONE << (T::UInt::BITS - P::BITS - 1)) - T::UInt::ONE);
+    
+    (max_switch * (area / (area + tail_area))).round_as_uint()
 }
 
-fn round_as_uint_saturating<T: Float>(a: T) -> T::UInt {
-    if a < T::cast_uint(T::UInt::MAX) {
-        a.round_as_uint()
-    } else {
-        T::UInt::MAX
-    }
-}

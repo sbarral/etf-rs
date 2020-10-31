@@ -11,7 +11,7 @@ struct UnscaledNormalPdf<T> {
 }
 
 impl<T: Float> UnivariateFn<T> for UnscaledNormalPdf<T> {
-    #[inline(always)]
+    #[inline]
     fn eval(&self, x: T) -> T {
         let dx = x - self.mean;
 
@@ -27,7 +27,7 @@ struct UnscaledCentralNormalPdf<T> {
 }
 
 impl<T: Float> UnivariateFn<T> for UnscaledCentralNormalPdf<T> {
-    #[inline(always)]
+    #[inline]
     fn eval(&self, x: T) -> T {
         (self.alpha * x * x).exp()
     }
@@ -51,7 +51,7 @@ impl<T: Float> NormalTailEnvelope<T> {
 }
 
 impl<T: Float> Envelope<T> for NormalTailEnvelope<T> {
-    #[inline(always)]
+    #[inline]
     fn try_sample<R: RngCore + ?Sized>(&self, rng: &mut R) -> Option<T> {
         loop {
             let x = (T::ONE - T::gen(rng)).ln() * self.a_x;
@@ -133,7 +133,7 @@ impl<T: NormalFloat> Normal<T> {
 }
 
 impl<T: NormalFloat> Distribution<T> for Normal<T> {
-    #[inline(always)]
+    #[inline]
     fn sample<R: RngCore + ?Sized>(&self, rng: &mut R) -> T {
         self.inner.sample(rng)
     }
@@ -158,7 +158,7 @@ impl<T: NormalFloat> CentralNormal<T> {
 }
 
 impl<T: NormalFloat> Distribution<T> for CentralNormal<T> {
-    #[inline(always)]
+    #[inline]
     fn sample<R: RngCore + ?Sized>(&self, rng: &mut R) -> T {
         self.inner.sample(rng)
     }
