@@ -1,6 +1,6 @@
 //! Utilites for ETF distributions generation.
 
-use super::{Envelope, InitTable, NodeArray, Partition, UnivariateFn};
+use super::{Envelope, InitTable, Partition, UnivariateFn};
 use crate::num::Float;
 
 use rand_core::RngCore;
@@ -32,6 +32,9 @@ fn solve_tma<T: Float>(a: &[T], b: &mut [T], c: &[T], rhs: &mut [T], sol: &mut [
 /// Generates a partition by dividing approximately evenly the area under a
 /// function.
 ///
+/// The result can be used as an initial guess of the ETF partition for the
+/// exact partitioning algorithm.
+///
 /// Function `f` is first approximated by a rectangular midpoint quadrature over
 /// a regular partition of [`x0`, `x1`] into `m` sub-intervals. Then, a
 /// non-regular partition of [`x0`, `x1`] is computed such that the area under
@@ -40,9 +43,9 @@ fn solve_tma<T: Float>(a: &[T], b: &mut [T], c: &[T], rhs: &mut [T], sol: &mut [
 /// If argument `m` is zero, then the number of midpoint quadrature
 /// sub-intervals is set equal to the number of sub-intervals of the target
 /// partition.
-pub fn midpoint_prepartition<P, T, F>(f: &F, x0: T, x1: T, m: usize) -> NodeArray<P, T>
+pub fn midpoint_prepartition<P, T, F>(f: &F, x0: T, x1: T, m: usize) -> P::NodeArray
 where
-    P: Partition,
+    P: Partition<T>,
     T: Float,
     F: UnivariateFn<T>,
 {
@@ -57,11 +60,10 @@ where
         .collect();
 
     // Pre-allocate the result partition.
-    let mut x = NodeArray::new();
+    let mut x: P::NodeArray = Default::default();
     {
         // Choose abscissae that evenly split the area under the curve.
-        let x = x.as_mut();
-        let n = x.len() - 1;
+        let n = P::SIZE;
         let ds = y.iter().fold(T::ZERO, |s, &y_| y_ + s) / T::cast_usize(n); // expected average sub-partition area
         let mut rect = 0;
         let mut x_rect = x0 + dx;
@@ -96,9 +98,9 @@ where
 /// If successful, the returned table contains the partition as well as the
 /// extrema of the function over each sub-interval.
 ///
-/// Function `f`, its derivative `df` and an ordered sequence of the extrema of
-/// `f` (boundary points excluded) must be provided, as well as a reasonable
-/// initial guess for the partition.
+/// Function `f`, its derivative `df` and an ordered sequence `x_extrema` of the
+/// extrema of `f` (boundary points excluded) must be provided, as well as a
+/// reasonable initial guess `x_init` for the partition.
 ///
 /// Convergence is deemed achieved when the difference between the areas of the
 /// largest rectangle and of the smallest rectangle relative to the average area
@@ -106,34 +108,38 @@ where
 /// not reached after the specified maximum number of iterations, a
 /// `TabulationError` is returned.
 ///
-/// It must be noted that the accuracy of the distribution sampling process
-/// itself will not be affected by the tabulation tolerance: this tolerance will
-/// only impacts the wedge sampling rate (i.e. how often a top floor is tested)
-/// and thus the average sampling speed. A tolerance of the order of 0.001 will
-/// often constitute a suitable compromise as it will at worse increase the
-/// wedge sampling rate by 0.1% while mitigating the risk of spurious
-/// convergence failures.
+/// In order to prevent sampling bias, once convergence is achieved the size of
+/// all rectangles is normalized to that of the largest rectangle. A higher
+/// tabulation tolerance therefore results in slightly larger rectangles,
+/// meaning that sampling will more frequently trigger a top floor
+/// acceptance-rejection test. Large tolerances can therefore slightly impact
+/// sample generation speed, but do not otherwise affect the quality of the
+/// distribution sampling process. Too low tolerances, on the other hand, may
+/// lead to spurious convergence failures due to floating-point round-off
+/// errors. In most cases, tolerances of the order of 0.001 or less will have no
+/// measurable impact on the sampling rate.
 ///
-/// A relaxation coefficient lower than 1 (resp. greater than 1) may be
-/// specified to improve convergence robustness (resp. speed).
+/// The recommended  value for `relaxation` is 1, but a relaxation coefficient
+/// lower than 1 (resp. greater than 1) may be specified to improve convergence
+/// robustness (resp. convergence speed).
 pub fn newton_tabulation<P, T, F, DF>(
     f: &F,
     df: &DF,
-    x_init: &NodeArray<P, T>,
+    x_init: &P::NodeArray,
     x_extrema: &[T],
     tolerance: T,
     relaxation: T,
     max_iter: u32,
 ) -> TabulationResult<InitTable<P, T>>
 where
-    P: Partition,
+    P: Partition<T>,
     T: Float,
     F: UnivariateFn<T>,
-    DF: UnivariateFn<T>,
+    DF: UnivariateFn<T>
 {
     // Initialize the quadrature table partition with the initial partition.
-    let mut table = InitTable::new();
-    table.x.as_mut().copy_from_slice(x_init.as_ref());
+    let mut table = InitTable::<P, T>::default();
+    table.x = x_init.clone();
 
     // Main vectors.
     let n = P::SIZE;
@@ -154,12 +160,12 @@ where
         .iter()
         .cloned()
         .zip(y_extrema.iter().cloned())
-        .filter(|&(x_e, _)| (x_e > table.x.as_ref()[0]) && (x_e < table.x.as_ref()[n]))
+        .filter(|&(x_e, _)| (x_e > table.x[0]) && (x_e < table.x[n]))
         .collect();
 
     // Boundary values are constants.
-    y[0] = f.eval(table.x.as_ref()[0]);
-    y[n] = f.eval(table.x.as_ref()[n]);
+    y[0] = f.eval(table.x[0]);
+    y[n] = f.eval(table.x[n]);
     dy_dx[0] = T::ZERO;
     dy_dx[n] = T::ZERO;
 
@@ -167,9 +173,9 @@ where
     let mut loop_iter = 0..max_iter;
     loop {
         // Convenient aliases.
-        let x = table.x.as_mut();
-        let yinf = table.yinf.as_mut();
-        let ysup = table.ysup.as_mut();
+        let x = &mut table.x;
+        let yinf = &mut table.yinf;
+        let ysup = &mut table.ysup;
 
         // Update inner nodes values.
         for i in 1..n {
@@ -191,7 +197,7 @@ where
             } else {
                 (y[i + 1], T::ZERO, dy_dx[i + 1])
             };
-            (*ysup)[i] = ysup_;
+            ysup[i] = ysup_;
             dysup_dxl[i] = dysup_dxl_;
             dysup_dxr[i] = dysup_dxr_;
 

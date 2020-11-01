@@ -65,7 +65,7 @@ impl<T: Float> Envelope<T> for NormalTailEnvelope<T> {
 
 pub trait NormalFloat: Float {
     #[doc(hidden)]
-    type P: partition::Partition + ValidSymmetricPartitionSize<Self>;
+    type P: partition::Partition<Self> + ValidSymmetricPartitionSize<Self>;
     #[doc(hidden)]
     const TOLERANCE: Self;
     #[doc(hidden)]
@@ -74,7 +74,7 @@ pub trait NormalFloat: Float {
 
 impl NormalFloat for f32 {
     #[doc(hidden)]
-    type P = partition::P128;
+    type P = partition::P128<f32>;
     #[doc(hidden)]
     const TOLERANCE: Self = 1.0e-4;
     #[doc(hidden)]
@@ -83,7 +83,7 @@ impl NormalFloat for f32 {
 
 impl NormalFloat for f64 {
     #[doc(hidden)]
-    type P = partition::P256;
+    type P = partition::P256<f64>;
     #[doc(hidden)]
     const TOLERANCE: Self = 1.0e-6;
     #[doc(hidden)]
@@ -102,7 +102,7 @@ fn normal_parts<T: NormalFloat, F: UnivariateFn<T>, DF: UnivariateFn<T>>(
     let tail_area = T::PI.sqrt() * std_dev * inv_sqrt_two * (T::TAIL_POS * inv_sqrt_two).erfc();
 
     // Build the distribution.
-    let init_nodes = util::midpoint_prepartition(&pdf, mean, tail_position, 0);
+    let init_nodes = util::midpoint_prepartition::<T::P, _, _>(&pdf, mean, tail_position, 0);
     let table =
         util::newton_tabulation(&pdf, &dpdf, &init_nodes, &[], T::TOLERANCE, T::ONE, 10).unwrap();
     let tail_func = NormalTailEnvelope::new(mean, std_dev, tail_position);

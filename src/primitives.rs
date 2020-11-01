@@ -64,10 +64,13 @@ pub trait Envelope<T> {
 
 /// Distribution with bounded support.
 #[derive(Clone)]
-pub struct DistAny<P, T: Float, F> {
-    data: Data<T>,
+pub struct DistAny<P, T, F>
+where
+    P: Partition<T>,
+    T: Float,
+{
+    data: Data<P, T>,
     func: F,
-    phantom_table_size: PhantomData<P>,
 }
 
 impl<P, T, F> DistAny<P, T, F>
@@ -80,23 +83,21 @@ where
         DistAny {
             data: process_table(T::ZERO, table, T::UInt::MAX),
             func: func,
-            phantom_table_size: PhantomData,
         }
     }
 }
 
 impl<P, T, F> Distribution<T> for DistAny<P, T, F>
 where
-    P: Partition,
+    P: Partition<T>,
     T: Float,
     F: UnivariateFn<T>,
 {
     #[inline]
     fn sample<R: RngCore + ?Sized>(&self, rng: &mut R) -> T {
-        let u_mask = (T::UInt::ONE << (T::UInt::BITS - P::BITS )) - T::UInt::ONE;
+        let u_mask = (T::UInt::ONE << (T::UInt::BITS - P::BITS)) - T::UInt::ONE;
 
         loop {
-
             let r = T::UInt::gen(rng);
 
             // Extract the significand from the rightmost bits.
@@ -131,8 +132,12 @@ where
 
 /// Distribution with rejection-sampled tail(s).
 #[derive(Clone)]
-pub struct DistAnyTailed<P, T: Float, F, E> {
-    data: Data<T>,
+pub struct DistAnyTailed<P, T, F, E>
+where
+    P: Partition<T>,
+    T: Float,
+{
+    data: Data<P, T>,
     func: F,
     tail_envelope: E,
     tail_switch: T::UInt,
@@ -161,17 +166,16 @@ where
 
 impl<P, T, F, E> Distribution<T> for DistAnyTailed<P, T, F, E>
 where
-    P: Partition,
+    P: Partition<T>,
     T: Float,
     F: UnivariateFn<T>,
     E: Envelope<T>,
 {
     #[inline]
     fn sample<R: RngCore + ?Sized>(&self, rng: &mut R) -> T {
-        let u_mask = (T::UInt::ONE << (T::UInt::BITS - P::BITS )) - T::UInt::ONE;
+        let u_mask = (T::UInt::ONE << (T::UInt::BITS - P::BITS)) - T::UInt::ONE;
 
         loop {
-
             let r = T::UInt::gen(rng);
 
             // Extract the significand from the rightmost bits.
@@ -215,8 +219,12 @@ where
 /// Distribution with symmetric probability density function about the origin
 /// and bounded support.
 #[derive(Clone)]
-pub struct DistCentral<P, T: Float, F> {
-    data: Data<T>,
+pub struct DistCentral<P, T, F>
+where
+    P: Partition<T>,
+    T: Float,
+{
+    data: Data<P, T>,
     func: F,
     phantom_table_size: PhantomData<P>,
 }
@@ -238,7 +246,7 @@ where
 
 impl<P, T, F> Distribution<T> for DistCentral<P, T, F>
 where
-    P: Partition,
+    P: Partition<T>,
     T: Float,
     F: UnivariateFn<T>,
 {
@@ -249,7 +257,6 @@ where
         let s_mask = T::UInt::ONE << (T::UInt::BITS - 1);
 
         loop {
-
             let mut r = T::UInt::gen(rng);
 
             // Extract the significand from the rightmost bits.
@@ -289,8 +296,12 @@ where
 /// Distribution with symmetric probability density function about the origin
 /// and rejection-sampled tail(s).
 #[derive(Clone)]
-pub struct DistCentralTailed<P, T: Float, F, E> {
-    data: Data<T>,
+pub struct DistCentralTailed<P, T, F, E>
+where
+    P: Partition<T>,
+    T: Float,
+{
+    data: Data<P, T>,
     func: F,
     tail_envelope: E,
     tail_switch: T::UInt,
@@ -318,7 +329,7 @@ where
 
 impl<P, T, F, E> Distribution<T> for DistCentralTailed<P, T, F, E>
 where
-    P: Partition,
+    P: Partition<T>,
     T: Float,
     F: UnivariateFn<T>,
     E: Envelope<T>,
@@ -330,7 +341,6 @@ where
         let s_mask = T::UInt::ONE << (T::UInt::BITS - 1);
 
         loop {
-
             let mut r = T::UInt::gen(rng);
 
             // Extract the significand from the rightmost bits.
@@ -377,8 +387,12 @@ where
 
 /// Distribution with symmetric probability density function and bounded support.
 #[derive(Clone)]
-pub struct DistSymmetric<P, T: Float, F> {
-    data: Data<T>,
+pub struct DistSymmetric<P, T, F>
+where
+    P: Partition<T>,
+    T: Float,
+{
+    data: Data<P, T>,
     func: F,
     x0: T,
     phantom_table_size: PhantomData<P>,
@@ -402,7 +416,7 @@ where
 
 impl<P, T, F> Distribution<T> for DistSymmetric<P, T, F>
 where
-    P: Partition,
+    P: Partition<T>,
     T: Float,
     F: UnivariateFn<T>,
 {
@@ -413,7 +427,6 @@ where
         let s_mask = T::UInt::ONE << (T::UInt::BITS - 1);
 
         loop {
-
             let mut r = T::UInt::gen(rng);
 
             // Extract the significand from the rightmost bits.
@@ -453,8 +466,12 @@ where
 
 /// Distribution with symmetric probability density function and rejection-sampled tail(s).
 #[derive(Clone)]
-pub struct DistSymmetricTailed<P, T: Float, F, E> {
-    data: Data<T>,
+pub struct DistSymmetricTailed<P, T, F, E>
+where
+    P: Partition<T>,
+    T: Float,
+{
+    data: Data<P, T>,
     func: F,
     x0: T,
     tail_envelope: E,
@@ -485,7 +502,7 @@ where
 
 impl<P, T, F, E> Distribution<T> for DistSymmetricTailed<P, T, F, E>
 where
-    P: Partition,
+    P: Partition<T>,
     T: Float,
     F: UnivariateFn<T>,
     E: Envelope<T>,
@@ -497,7 +514,6 @@ where
         let s_mask = T::UInt::ONE << (T::UInt::BITS - 1);
 
         loop {
-
             let mut r = T::UInt::gen(rng);
 
             // Extract the significand from the rightmost bits.
@@ -543,35 +559,30 @@ where
     }
 }
 
-// Distribution table datum.
-#[repr(C)]
-#[derive(Copy, Clone)]
-struct TableDatum<T: Float> {
-    alpha: T,              // (x[i+1] - x[i]) / wedge_switch[i]
-    beta: T,               // x[i] - x0
-    wedge_switch: T::UInt, // (yinf / ysup) * tail_switch
-}
-
 #[derive(Clone)]
-struct Data<T: Float> {
-    table: Vec<TableDatum<T>>,
+struct Data<P, T>
+where
+    P: Partition<T>,
+    T: Float,
+{
+    table: P::DataArray,
     scaled_xysup: T, // dx * ysup / tail_switch
 }
 
 // Generates an optimized lookup table from a quadrature table.
-fn process_table<P, T>(x0: T, init_table: &InitTable<P, T>, tail_switch: T::UInt) -> Data<T>
+fn process_table<P, T>(x0: T, init_table: &InitTable<P, T>, tail_switch: T::UInt) -> Data<P, T>
 where
-    P: Partition,
+    P: Partition<T>,
     T: Float,
 {
     let max_bit_loss = T::ONE;
     let n = P::SIZE;
-    let mut table = Vec::with_capacity(n + 1);
+    let mut table = P::DataArray::default();
 
     // Convenient aliases.
-    let x = init_table.x.as_ref();
-    let yinf = init_table.yinf.as_ref();
-    let ysup = init_table.ysup.as_ref();
+    let x = &init_table.x;
+    let yinf = &init_table.yinf;
+    let ysup = &init_table.ysup;
 
     // Compute the final table.
     for i in 0..n {
@@ -592,19 +603,19 @@ where
             (T::UInt::ZERO, T::ZERO)
         };
 
-        table.push(TableDatum {
+        table[i] = Datum {
             alpha,
             beta: x[i] - x0,
             wedge_switch,
-        });
+        };
     }
 
     // Last datum is dummy except for the x value.
-    table.push(TableDatum {
+    table[n] = Datum {
         alpha: T::ZERO, // never used
         beta: x[n] - x0,
         wedge_switch: T::UInt::ZERO, // never used
-    });
+    };
 
     // Scaled area of a single rectangle.
     let scaled_xysup = (x[1] - x[0]) * ysup[0] / T::cast_uint(tail_switch);
@@ -618,19 +629,17 @@ where
 // Computes the integer used as a threshold for tail sampling.
 fn compute_tail_switch<P, T>(init_table: &InitTable<P, T>, tail_area: T) -> T::UInt
 where
-    P: Partition,
+    P: Partition<T>,
     T: Float,
 {
     // Convenient aliases.
-    let x = init_table.x.as_ref();
-    let ysup = init_table.ysup.as_ref();
+    let x = &init_table.x;
+    let ysup = &init_table.ysup;
 
     let mut area = T::ZERO;
     for i in 0..P::SIZE {
         area = area + (x[i + 1] - x[i]) * ysup[i];
     }
     let max_switch = T::cast_uint((T::UInt::ONE << (T::UInt::BITS - P::BITS - 1)) - T::UInt::ONE);
-    
     (max_switch * (area / (area + tail_area))).round_as_uint()
 }
-

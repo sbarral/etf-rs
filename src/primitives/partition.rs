@@ -2,147 +2,175 @@
 
 use crate::num::Float;
 
-use std::borrow::{Borrow, BorrowMut};
-use std::hash::Hash;
+use std::convert::TryInto;
+use std::fmt::Debug;
 use std::marker::PhantomData;
+use std::ops::{Index, IndexMut};
 
-/// Marker trait for partition size.
-pub trait Partition: Copy + Clone + Default + PartialEq + PartialOrd + Eq + Ord + Hash {
+
+/// Tabulation datum type (internal use only).
+#[repr(C)]
+#[derive(Copy, Clone, Default, Debug)]
+pub struct Datum<T: Float> {
+    pub(crate) alpha: T,              // (x[i+1] - x[i]) / wedge_switch[i]
+    pub(crate) beta: T,               // x[i] - x0
+    pub(crate) wedge_switch: T::UInt, // (yinf / ysup) * tail_switch
+}
+
+/// Fixed-size partition of an interval into subintervals.
+pub trait Partition<T: Float> {
     const BITS: u32;
     const SIZE: usize;
+    
+    type NodeArray: Clone + Default + Index<usize, Output=T> + IndexMut<usize>;
+    type IntervalArray: Clone + Default + Index<usize, Output=T> + IndexMut<usize>;
+    type DataArray: Clone + Default + Index<usize, Output=Datum<T>> + IndexMut<usize>;
 }
 
-/// A fixed-size array with `N+1` elements where `N` is the partition size.
-///
-/// The array content can be accessed via the `AsRef` and `AsMut` traits.
-#[derive(Clone, PartialEq, PartialOrd, Eq, Ord, Hash)]
-pub struct NodeArray<P: Partition, T: Float> {
-    inner: Vec<T>,
-    phantom: PhantomData<P>,
-}
-impl<P: Partition, T: Float> NodeArray<P, T> {
-    pub fn new() -> Self {
-        let mut inner = Vec::with_capacity(P::SIZE + 1);
-        inner.resize(P::SIZE + 1, T::ZERO);
-
-        Self {
-            inner: inner,
-            phantom: PhantomData,
-        }
-    }
-}
-impl<P: Partition, T: Float> Default for NodeArray<P, T> {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-impl<P: Partition, T: Float> AsRef<[T]> for NodeArray<P, T> {
-    fn as_ref(&self) -> &[T] {
-        &self.inner
-    }
-}
-impl<P: Partition, T: Float> AsMut<[T]> for NodeArray<P, T> {
-    fn as_mut(&mut self) -> &mut [T] {
-        &mut self.inner
-    }
-}
-impl<P: Partition, T: Float> Borrow<[T]> for NodeArray<P, T> {
-    fn borrow(&self) -> &[T] {
-        &self.inner
-    }
-}
-impl<P: Partition, T: Float> BorrowMut<[T]> for NodeArray<P, T> {
-    fn borrow_mut(&mut self) -> &mut [T] {
-        &mut self.inner
-    }
-}
-
-/// A fixed-size array with `N` elements where `N` is the partition size.
-///
-/// The array content can be accessed via the `AsRef` and `AsMut` traits.
-#[derive(Clone, PartialEq, PartialOrd, Eq, Ord, Hash)]
-pub struct IntervalArray<P: Partition, T: Float> {
-    inner: Vec<T>,
-    phantom: PhantomData<P>,
-}
-impl<P: Partition, T: Float> IntervalArray<P, T> {
-    pub fn new() -> Self {
-        let mut inner = Vec::with_capacity(P::SIZE);
-        inner.resize(P::SIZE, T::ZERO);
-        Self {
-            inner: inner,
-            phantom: PhantomData,
-        }
-    }
-}
-impl<P: Partition, T: Float> Default for IntervalArray<P, T> {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-impl<P: Partition, T: Float> AsRef<[T]> for IntervalArray<P, T> {
-    fn as_ref(&self) -> &[T] {
-        &self.inner
-    }
-}
-impl<P: Partition, T: Float> AsMut<[T]> for IntervalArray<P, T> {
-    fn as_mut(&mut self) -> &mut [T] {
-        &mut self.inner
-    }
-}
-impl<P: Partition, T: Float> Borrow<[T]> for IntervalArray<P, T> {
-    fn borrow(&self) -> &[T] {
-        &self.inner
-    }
-}
-impl<P: Partition, T: Float> BorrowMut<[T]> for IntervalArray<P, T> {
-    fn borrow_mut(&mut self) -> &mut [T] {
-        &mut self.inner
-    }
-}
-
-/// Dataset for ETF distribution generation.
-#[derive(Clone, Default, PartialEq, PartialOrd, Eq, Ord, Hash)]
-pub struct InitTable<P: Partition, T: Float> {
-    pub x: NodeArray<P, T>,
-    pub yinf: IntervalArray<P, T>,
-    pub ysup: IntervalArray<P, T>,
-}
-impl<P: Partition, T: Float> InitTable<P, T> {
-    pub fn new() -> Self {
-        Self {
-            x: NodeArray::new(),
-            yinf: IntervalArray::new(),
-            ysup: IntervalArray::new(),
-        }
-    }
-}
-
-macro_rules! make_partition_size {
-    ($bits:expr, $sz: expr, $ps:ident, $szs:expr) => {
-        #[doc = "Size marker for "]
+macro_rules! setup_partition {
+    ($p:ident, $ia:ident, $na:ident, $da:ident, $sz:expr, $szs:expr, $szsd:expr, $bits:expr) => {
+        #[doc = "A partition with"]
         #[doc = $szs]
-        #[doc = "-interval partition."]
-        #[derive(Copy, Clone, Default, PartialEq, PartialOrd, Eq, Ord, Hash)]
-        pub struct $ps;
-
-        impl Partition for $ps {
+        #[doc = "subintervals."]
+        #[derive(Clone, Default)]
+        pub struct $p<T> {
+            _phantom: PhantomData<T>
+        }
+        
+        impl<T: Float> Partition<T> for $p<T> {
             const BITS: u32 = $bits;
             const SIZE: usize = $sz;
+            
+            type IntervalArray = $ia<T>;
+            type NodeArray = $na<T>;
+            type DataArray = $da<T>;
+        }
+        
+        #[doc = "Value array of size"]
+        #[doc = $szsd]
+        #[derive(Clone)]
+        pub struct $ia<T>(Box<[T; $sz]>);
+
+        impl<T> Index<usize> for $ia<T> {
+            type Output = T;
+            fn index(&self, index: usize) -> &T {
+                &self.0[index]
+            }
+        }
+
+        impl<T> IndexMut<usize> for $ia<T> {
+            fn index_mut(&mut self, index: usize) -> &mut T {
+                &mut self.0[index]
+            }
+        }
+        
+        impl<T: Default + Copy + Debug> Default for $ia<T> {
+            fn default() -> Self {
+                // Get the boxed array from a Vec to avoid placing a temporary array on the stack.
+                let mut vec = Vec::new();
+                vec.resize_with($sz, Default::default);
+                let boxed_slice = vec.into_boxed_slice();
+                let boxed_array = boxed_slice.try_into().unwrap();
+                
+                Self(boxed_array)
+            }
+        }
+        
+        
+        #[doc = "Value array of size"]
+        #[doc = $szs]
+        #[doc = "+ 1."]
+        #[derive(Clone)]
+        pub struct $na<T>(Box<[T; $sz + 1]>);
+
+        impl<T> Index<usize> for $na<T> {
+            type Output = T;
+            fn index(&self, index: usize) -> &T {
+                &self.0[index]
+            }
+        }
+
+        impl<T> IndexMut<usize> for $na<T> {
+            fn index_mut(&mut self, index: usize) -> &mut T {
+                &mut self.0[index]
+            }
+        }
+        
+        impl<T: Default + Copy + Debug> Default for $na<T> {
+            fn default() -> Self {
+                // Get the boxed array from a Vec to avoid placing a temporary array on the stack.
+                let mut vec = Vec::new();
+                vec.resize_with($sz + 1, Default::default);
+                let boxed_slice = vec.into_boxed_slice();
+                let boxed_array = boxed_slice.try_into().unwrap();
+                
+                Self(boxed_array)
+            }
+        }
+        
+        #[doc = "Data array of size"]
+        #[doc = $szs]
+        #[doc = "+ 1."]
+        #[derive(Clone)]
+        pub struct $da<T: Float>(Box<[Datum<T>; $sz + 1]>);
+
+        impl<T: Float> Index<usize> for $da<T> {
+            type Output = Datum<T>;
+            fn index(&self, index: usize) -> &Datum<T> {
+                &self.0[index]
+            }
+        }
+
+        impl<T: Float> IndexMut<usize> for $da<T> {
+            fn index_mut(&mut self, index: usize) -> &mut Datum<T> {
+                &mut self.0[index]
+            }
+        }
+        
+        impl<T: Float> Default for $da<T> {
+            fn default() -> Self {
+                // Get the boxed array from a Vec to avoid placing a temporary array on the stack.
+                let mut vec = Vec::new();
+                vec.resize_with($sz + 1, Default::default);
+                let boxed_slice = vec.into_boxed_slice();
+                let boxed_array = boxed_slice.try_into().unwrap();
+                
+                Self(boxed_array)
+            }
         }
     };
 
-    ($bits:expr, $sz:expr, $ps:ident) => {
-        make_partition_size!($bits, $sz, $ps, stringify!($sz));
+    ($p:ident, $ia:ident, $na:ident, $da:ident, $sz:expr, $bits:expr) => {
+        setup_partition!($p, $ia, $na, $da, $sz, stringify!($sz), concat!($sz, "."), $bits);
     }
 }
 
-make_partition_size!(4, 16, P16);
-make_partition_size!(5, 32, P32);
-make_partition_size!(6, 64, P64);
-make_partition_size!(7, 128, P128);
-make_partition_size!(8, 256, P256);
-make_partition_size!(9, 512, P512);
-make_partition_size!(10, 1024, P1024);
-make_partition_size!(11, 2048, P2048);
-make_partition_size!(12, 4096, P4096);
+
+setup_partition!(P16, IntervalArray16, NodeArray16, DataArray16, 16, 4);
+setup_partition!(P32, IntervalArray32, NodeArray32, DataArray32, 32, 5);
+setup_partition!(P64, IntervalArray64, NodeArray64, DataArray64, 64, 6);
+setup_partition!(P128, IntervalArray128, NodeArray128, DataArray128, 128, 7);
+setup_partition!(P256, IntervalArray256, NodeArray256, DataArray256, 256, 8);
+setup_partition!(P512, IntervalArray512, NodeArray512, DataArray512, 512, 9);
+setup_partition!(P1024, IntervalArray1024, NodeArray1024, DataArray1024, 1024, 10);
+setup_partition!(P2048, IntervalArray2048, NodeArray2048, DataArray2048, 2048, 11);
+setup_partition!(P4096, IntervalArray4096, NodeArray4096, DataArray4096, 4096, 12);
+
+/// Dataset for ETF distribution generation.
+#[derive(Clone, PartialEq, PartialOrd)]
+pub struct InitTable<P: Partition<T>, T: Float> {
+    pub x: P::NodeArray,
+    pub yinf: P::IntervalArray,
+    pub ysup: P::IntervalArray,
+}
+
+impl<P: Partition<T>, T: Float> Default for InitTable<P, T> {
+    fn default() -> Self {
+        Self {
+            x: P::NodeArray::default(),
+            yinf: P::IntervalArray::default(),
+            ysup: P::IntervalArray::default(),
+        
+        }
+    }
+}

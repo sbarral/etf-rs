@@ -56,7 +56,7 @@ impl<T: Float> Envelope<T> for CauchyTailEnvelope<T> {
 
 pub trait CauchyFloat: Float {
     #[doc(hidden)]
-    type P: partition::Partition + ValidSymmetricPartitionSize<Self>;
+    type P: partition::Partition<Self> + ValidSymmetricPartitionSize<Self>;
     #[doc(hidden)]
     const TOLERANCE: Self;
     #[doc(hidden)]
@@ -65,7 +65,7 @@ pub trait CauchyFloat: Float {
 
 impl CauchyFloat for f32 {
     #[doc(hidden)]
-    type P = partition::P128;
+    type P = partition::P128<f32>;
     #[doc(hidden)]
     const TOLERANCE: Self = 1.0e-4;
     #[doc(hidden)]
@@ -74,7 +74,7 @@ impl CauchyFloat for f32 {
 
 impl CauchyFloat for f64 {
     #[doc(hidden)]
-    type P = partition::P256;
+    type P = partition::P256<f64>;
     #[doc(hidden)]
     const TOLERANCE: Self = 1.0e-6;
     #[doc(hidden)]
@@ -104,7 +104,7 @@ impl<T: CauchyFloat> Cauchy<T> {
 
         let tail_position = location + T::TAIL_POS * scale;
         let tail_area = scale * (T::atan(-T::TAIL_POS) + T::from(0.5) * T::PI);
-        let init_nodes = util::midpoint_prepartition(&pdf, location, tail_position, 0);
+        let init_nodes = util::midpoint_prepartition::<T::P, _, _>(&pdf, location, tail_position, 0);
         let table =
             util::newton_tabulation(&pdf, &dpdf, &init_nodes, &[], T::TOLERANCE, T::ONE, 10)
                 .unwrap();
