@@ -1,16 +1,14 @@
 //! Primitive ETF distributions and related utilities.
 
-// Internal traits.
 use crate::num::{Float, UInt};
 use partition::*;
-pub use table_validation::*;
-
-// External traits.
 use rand_core::RngCore;
 use std::marker::PhantomData;
+use storage::Datum;
+pub use table_validation::*;
 
-// Modules.
 pub mod partition;
+mod storage;
 mod table_validation;
 pub mod util;
 
@@ -21,7 +19,7 @@ pub mod util;
 /// `Fn(T) -> T` trait for custom functor types (see
 /// [this issue](https://github.com/rust-lang/rust/issues/29625)),
 /// but also provides an optimization opportunity for the implementations of the
-/// wedge acceptance-rejection test.
+/// wedge acceptance-rejection test (see the [test](#method.test) method).
 ///
 pub trait UnivariateFn<T: Float> {
     /// Evaluates the function at `x`.
@@ -565,7 +563,7 @@ where
     P: Partition<T>,
     T: Float,
 {
-    table: P::DataArray,
+    table: DataArray<P, T>,
     scaled_xysup: T, // dx * ysup / tail_switch
 }
 
@@ -577,7 +575,7 @@ where
 {
     let max_bit_loss = T::ONE;
     let n = P::SIZE;
-    let mut table = P::DataArray::default();
+    let mut table = DataArray::default();
 
     // Convenient aliases.
     let x = &init_table.x;

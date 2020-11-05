@@ -13,7 +13,7 @@ fn normal_32_collisions() {
     let std_dev = 2.8_f64;
 
     collisions(
-        Normal::new(mean as f32, std_dev as f32),
+        Normal::new(mean as f32, std_dev as f32).unwrap(),
         |x| normal_cdf(x, mean, std_dev),
         20,
         64,
@@ -29,7 +29,7 @@ fn normal_64_collisions() {
     let std_dev = 2.8_f64;
 
     collisions(
-        Normal::new(mean as f64, std_dev as f64),
+        Normal::new(mean as f64, std_dev as f64).unwrap(),
         |x| normal_cdf(x, mean, std_dev),
         20,
         64,
@@ -43,7 +43,7 @@ fn central_normal_32_collisions() {
     let std_dev = 0.7_f64;
 
     collisions(
-        CentralNormal::new(std_dev as f32),
+        CentralNormal::new(std_dev as f32).unwrap(),
         |x| normal_cdf(x, 0.0, std_dev),
         20,
         64,
@@ -57,7 +57,7 @@ fn central_normal_64_collisions() {
     let std_dev = 0.7_f64;
 
     collisions(
-        CentralNormal::new(std_dev as f64),
+        CentralNormal::new(std_dev as f64).unwrap(),
         |x| normal_cdf(x, 0.0, std_dev),
         20,
         64,
@@ -73,7 +73,7 @@ fn normal_32_fit() {
     let n_sigma = 4.0_f64; // test interval half-width in standard deviation units
 
     goodness_of_fit(
-        Normal::new(mean as f32, std_dev as f32),
+        Normal::new(mean as f32, std_dev as f32).unwrap(),
         |x| normal_cdf(x, mean, std_dev),
         mean - n_sigma * std_dev,
         mean + n_sigma * std_dev,
@@ -90,7 +90,7 @@ fn normal_64_fit() {
     let n_sigma = 4.0_f64; // test interval half-width in std. dev. units
 
     goodness_of_fit(
-        Normal::new(mean as f64, std_dev as f64),
+        Normal::new(mean as f64, std_dev as f64).unwrap(),
         |x| normal_cdf(x, mean, std_dev),
         mean - n_sigma * std_dev,
         mean + n_sigma * std_dev,
@@ -106,7 +106,7 @@ fn central_normal_32_fit() {
     let n_sigma = 4.0_f64; // test interval half-width in standard deviation units
 
     goodness_of_fit(
-        CentralNormal::new(std_dev as f32),
+        CentralNormal::new(std_dev as f32).unwrap(),
         |x| normal_cdf(x, 0.0, std_dev),
         - n_sigma * std_dev,
         n_sigma * std_dev,
@@ -122,7 +122,7 @@ fn central_normal_64_fit() {
     let n_sigma = 4.0_f64; // test interval half-width in std. dev. units
 
     goodness_of_fit(
-        CentralNormal::new(std_dev as f64),
+        CentralNormal::new(std_dev as f64).unwrap(),
         |x| normal_cdf(x, 0.0, std_dev),
         - n_sigma * std_dev,
         n_sigma * std_dev,

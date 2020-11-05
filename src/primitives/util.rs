@@ -1,32 +1,15 @@
 //! Utilites for ETF distributions generation.
 
-use super::{Envelope, InitTable, Partition, UnivariateFn};
+use super::{Envelope, InitTable, NodeArray, Partition, UnivariateFn};
 use crate::num::Float;
-
 use rand_core::RngCore;
+use thiserror::Error;
 
-mod error;
-pub use error::*;
-
-// Tri-diagonal matrix algorithm.
-//
-// For the sake of efficiency, diagonal terms and RHS are modified in-place.
-// All slices have equal length.
-fn solve_tma<T: Float>(a: &[T], b: &mut [T], c: &[T], rhs: &mut [T], sol: &mut [T]) {
-    let m = a.len();
-
-    // Eliminate the sub-diagonal.
-    for i in 1..m {
-        let pivot = a[i] / b[i - 1];
-        b[i] = b[i] - pivot * c[i - 1];
-        rhs[i] = rhs[i] - pivot * rhs[i - 1];
-    }
-
-    // Solve the remaining upper bi-diagonal system.
-    sol[m - 1] = rhs[m - 1] / b[m - 1];
-    for i in (0..m - 1).rev() {
-        sol[i] = (rhs[i] - c[i] * sol[i + 1]) / b[i];
-    }
+/// An error that can occur during a tabulation computation.
+#[derive(Error, Debug)]
+pub enum TabulationError {
+    #[error("the solution did not convergence after the maximum number of iterations")]
+    ConvergenceFailure,
 }
 
 /// Generates a partition by dividing approximately evenly the area under a
@@ -43,7 +26,7 @@ fn solve_tma<T: Float>(a: &[T], b: &mut [T], c: &[T], rhs: &mut [T], sol: &mut [
 /// If argument `m` is zero, then the number of midpoint quadrature
 /// sub-intervals is set equal to the number of sub-intervals of the target
 /// partition.
-pub fn midpoint_prepartition<P, T, F>(f: &F, x0: T, x1: T, m: usize) -> P::NodeArray
+pub fn midpoint_prepartition<P, T, F>(f: &F, x0: T, x1: T, m: usize) -> NodeArray<P, T>
 where
     P: Partition<T>,
     T: Float,
@@ -60,7 +43,7 @@ where
         .collect();
 
     // Pre-allocate the result partition.
-    let mut x: P::NodeArray = Default::default();
+    let mut x = NodeArray::default();
     {
         // Choose abscissae that evenly split the area under the curve.
         let n = P::SIZE;
@@ -125,20 +108,20 @@ where
 pub fn newton_tabulation<P, T, F, DF>(
     f: &F,
     df: &DF,
-    x_init: &P::NodeArray,
+    x_init: &NodeArray<P, T>,
     x_extrema: &[T],
     tolerance: T,
     relaxation: T,
     max_iter: u32,
-) -> TabulationResult<InitTable<P, T>>
+) -> Result<InitTable<P, T>, TabulationError>
 where
     P: Partition<T>,
     T: Float,
     F: UnivariateFn<T>,
-    DF: UnivariateFn<T>
+    DF: UnivariateFn<T>,
 {
     // Initialize the quadrature table partition with the initial partition.
-    let mut table = InitTable::<P, T>::default();
+    let mut table = InitTable::default();
     table.x = x_init.clone();
 
     // Main vectors.
@@ -266,7 +249,7 @@ where
 
         // Exit if convergence could not be achieved.
         if loop_iter.next().is_none() || mean_area.is_nan() {
-            return Err(TabulationError::new(max_iter));
+            return Err(TabulationError::ConvergenceFailure);
         }
 
         // Difference in area between neighboring rectangles and partial
@@ -401,5 +384,26 @@ impl<T: Float, F: UnivariateFn<T>> Envelope<T> for WeibullEnvelope<T, F> {
         } else {
             None
         }
+    }
+}
+
+// Tri-diagonal matrix algorithm.
+//
+// For the sake of efficiency, diagonal terms and RHS are modified in-place.
+// All slices have equal length.
+fn solve_tma<T: Float>(a: &[T], b: &mut [T], c: &[T], rhs: &mut [T], sol: &mut [T]) {
+    let m = a.len();
+
+    // Eliminate the sub-diagonal.
+    for i in 1..m {
+        let pivot = a[i] / b[i - 1];
+        b[i] = b[i] - pivot * c[i - 1];
+        rhs[i] = rhs[i] - pivot * rhs[i - 1];
+    }
+
+    // Solve the remaining upper bi-diagonal system.
+    sol[m - 1] = rhs[m - 1] / b[m - 1];
+    for i in (0..m - 1).rev() {
+        sol[i] = (rhs[i] - c[i] * sol[i + 1]) / b[i];
     }
 }

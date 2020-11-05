@@ -1,7 +1,7 @@
 //! ETF-based implementation of common continuous probability distributions.
 
-pub use normal::{Normal, CentralNormal};
-pub use cauchy::Cauchy;
+pub use cauchy::{Cauchy, CauchyError, CauchyFloat};
+pub use normal::{CentralNormal, Normal, NormalError, NormalFloat};
 
-mod normal;
 mod cauchy;
+mod normal;

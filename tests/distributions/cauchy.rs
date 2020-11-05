@@ -13,7 +13,7 @@ fn cauchy_32_collisions() {
     let scale = 2.8_f64;
 
     collisions(
-        Cauchy::new(location as f32, scale as f32),
+        Cauchy::new(location as f32, scale as f32).unwrap(),
         |x| cauchy_cdf(x, location, scale),
         20,
         64,
@@ -29,7 +29,7 @@ fn cauchy_64_collisions() {
     let scale = 2.8_f64;
 
     collisions(
-        Cauchy::new(location as f64, scale as f64),
+        Cauchy::new(location as f64, scale as f64).unwrap(),
         |x| cauchy_cdf(x, location, scale),
         20,
         64,
@@ -45,7 +45,7 @@ fn cauchy_32_fit() {
     let n_scale = 4.0_f64; // test interval half-width in scale units
 
     goodness_of_fit(
-        Cauchy::new(location as f32, scale as f32),
+        Cauchy::new(location as f32, scale as f32).unwrap(),
         |x| cauchy_cdf(x, location, scale),
         location - n_scale * scale,
         location + n_scale * scale,
@@ -63,7 +63,7 @@ fn cauchy_64_fit() {
     let n_scale = 4.0_f64; // test interval half-width in scale units
 
     goodness_of_fit(
-        Cauchy::new(location as f64, scale as f64),
+        Cauchy::new(location as f64, scale as f64).unwrap(),
         |x| cauchy_cdf(x, location, scale),
         location - n_scale * scale,
         location + n_scale * scale,

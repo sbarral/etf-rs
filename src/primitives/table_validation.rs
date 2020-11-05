@@ -1,7 +1,7 @@
 //! Table size validity marker traits.
 
 use crate::num::Float;
-use super::partition::*;
+use super::*;
 
 
 /// Table size validity marker trait for asymmetric distributions.
