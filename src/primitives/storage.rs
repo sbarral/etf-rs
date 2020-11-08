@@ -1,3 +1,5 @@
+use std::convert::TryInto;
+use std::fmt::Debug;
 
 /// Tabulation datum type (internal use only).
 #[repr(C)]
@@ -10,19 +12,31 @@ pub struct Datum<T: super::Float> {
 
 /// Backing storage for fixed-size arrays (internal use only).
 pub trait Storage<T>: Clone + AsRef<[T]> + AsMut<[T]> {
-    fn init() -> Self;
+    fn allocate() -> Box<Self>;
 }
 
 macro_rules! impl_storage {
     ($sz:expr) => {
-        impl<T: Default + Copy> Storage<T> for [T; $sz] {
-            fn init() -> Self {
-                [T::default(); $sz]
+        impl<T: Default + Copy + Debug> Storage<T> for [T; $sz] {
+            fn allocate() -> Box<Self> {
+                // Get the boxed array from a Vec to avoid placing a temporary array on the stack.
+                let mut vec = Vec::new();
+                vec.resize_with($sz, Default::default);
+                let boxed_slice = vec.into_boxed_slice();
+                let boxed_array = boxed_slice.try_into().unwrap();
+                
+                boxed_array
             }
         }
-        impl<T: Default + Copy> Storage<T> for [T; $sz + 1] {
-            fn init() -> Self {
-                [T::default(); $sz + 1]
+        impl<T: Default + Copy + Debug> Storage<T> for [T; $sz + 1] {
+            fn allocate() -> Box<Self> {
+                // Get the boxed array from a Vec to avoid placing a temporary array on the stack.
+                let mut vec = Vec::new();
+                vec.resize_with($sz + 1, Default::default);
+                let boxed_slice = vec.into_boxed_slice();
+                let boxed_array = boxed_slice.try_into().unwrap();
+                
+                boxed_array
             }
         }
     }

@@ -5,7 +5,7 @@ use crate::num::Float;
 use std::marker::PhantomData;
 use std::ops::{Index, IndexMut};
 
-/// Partition of an interval into subintervals.
+/// Marker trait for the partition of an interval into N subintervals.
 pub trait Partition<T: Float>: Clone {
     const BITS: u32;
     const SIZE: usize;
@@ -49,70 +49,70 @@ make_partition!(P1024, 1024, 10);
 make_partition!(P2048, 2048, 11);
 make_partition!(P4096, 4096, 12);
 
-/// Array of values defined over partition nodes.
+/// Array of N values defined over the subintervals of an N-subinterval partition.
 #[derive(Clone)]
-pub struct NodeArray<P: Partition<T>, T: Float>(P::NodeStorage);
+pub struct IntervalArray<P: Partition<T>, T: Float>(Box<P::IntervalStorage>);
 
 impl<P: Partition<T>, T: Float> Default for IntervalArray<P, T> {
     fn default() -> Self {
-        Self(P::IntervalStorage::init())
+        Self(P::IntervalStorage::allocate())
     }
 }
 impl<P: Partition<T>, T: Float> Index<usize> for IntervalArray<P, T> {
     type Output = T;
     fn index(&self, index: usize) -> &T {
-        &self.0.as_ref()[index]
+        &(*self.0).as_ref()[index]
     }
 }
 impl<P: Partition<T>, T: Float> IndexMut<usize> for IntervalArray<P, T> {
     fn index_mut(&mut self, index: usize) -> &mut T {
-        &mut self.0.as_mut()[index]
+        &mut (*self.0).as_mut()[index]
     }
 }
 
-/// Array of values defined over partition intervals.
+/// Array of N+1 values defined over the nodes of an N-subinterval partition .
 #[derive(Clone)]
-pub struct IntervalArray<P: Partition<T>, T: Float>(P::IntervalStorage);
+pub struct NodeArray<P: Partition<T>, T: Float>(Box<P::NodeStorage>);
 
 impl<P: Partition<T>, T: Float> Default for NodeArray<P, T> {
     fn default() -> Self {
-        Self(P::NodeStorage::init())
+        Self(P::NodeStorage::allocate())
     }
 }
 impl<P: Partition<T>, T: Float> Index<usize> for NodeArray<P, T> {
     type Output = T;
     fn index(&self, index: usize) -> &T {
-        &self.0.as_ref()[index]
+        &(*self.0).as_ref()[index]
     }
 }
 impl<P: Partition<T>, T: Float> IndexMut<usize> for NodeArray<P, T> {
     fn index_mut(&mut self, index: usize) -> &mut T {
-        &mut self.0.as_mut()[index]
+        &mut (*self.0).as_mut()[index]
     }
 }
 
-/// Array of data defined over partition intervals.
+/// Array of N+1 data defined over the nodes of an N-subinterval partition.
 #[derive(Clone)]
-pub(crate) struct DataArray<P: Partition<T>, T: Float>(P::DataStorage);
+pub(crate) struct DataArray<P: Partition<T>, T: Float>(Box<P::DataStorage>);
 
 impl<P: Partition<T>, T: Float> Default for DataArray<P, T> {
     fn default() -> Self {
-        Self(P::DataStorage::init())
+        Self(P::DataStorage::allocate())
     }
 }
 impl<P: Partition<T>, T: Float> Index<usize> for DataArray<P, T> {
     type Output = Datum<T>;
     fn index(&self, index: usize) -> &Datum<T> {
-        &self.0.as_ref()[index]
+        &(*self.0).as_ref()[index]
     }
 }
 impl<P: Partition<T>, T: Float> IndexMut<usize> for DataArray<P, T> {
     fn index_mut(&mut self, index: usize) -> &mut Datum<T> {
-        &mut self.0.as_mut()[index]
+        &mut (*self.0).as_mut()[index]
     }
 }
 
-/// Dataset for ETF distribution generation.
+/// ETF distribution initialization table.
 #[derive(Clone)]
 pub struct InitTable<P: Partition<T>, T: Float> {
     pub x: NodeArray<P, T>,

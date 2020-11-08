@@ -72,7 +72,7 @@ where
     x
 }
 
-/// Computes a distribution initialization table using Newton's method.
+/// Computes an ETF distribution initialization table using Newton's method.
 ///
 /// The multivariate Newton's method is used to compute a partition such that
 /// the rectangles making up an upper Riemann sum of function `f` have equal
@@ -94,13 +94,12 @@ where
 /// In order to prevent sampling bias, once convergence is achieved the size of
 /// all rectangles is normalized to that of the largest rectangle. A higher
 /// tabulation tolerance therefore results in slightly larger rectangles,
-/// meaning that sampling will more frequently trigger a top floor
-/// acceptance-rejection test. Large tolerances can therefore slightly impact
-/// sample generation speed, but do not otherwise affect the quality of the
-/// distribution sampling process. Too low tolerances, on the other hand, may
-/// lead to spurious convergence failures due to floating-point round-off
-/// errors. In most cases, tolerances of the order of 0.001 or less will have no
-/// measurable impact on the sampling rate.
+/// meaning that sampling will be slightly suboptimal due to more frequent top
+/// floor acceptance-rejection test. This does not affect, however, the quality
+/// of the samples. Too low tolerances, on the other hand, may lead to spurious
+/// convergence failures due to floating-point round-off errors. In most cases,
+/// tolerances of the order of 0.001 or less will have no measurable impact on
+/// the sampling rate.
 ///
 /// The recommended  value for `relaxation` is 1, but a relaxation coefficient
 /// lower than 1 (resp. greater than 1) may be specified to improve convergence
