@@ -8,7 +8,7 @@ use thiserror::Error;
 /// A floating point type for use with normal distributions.
 pub trait NormalFloat: Float {
     #[doc(hidden)]
-    type P: Partition<Self> + ValidSymmetricPartitionSize<Self>;
+    type P: Partition<Self>;
     #[doc(hidden)]
     const TOLERANCE: Self;
     #[doc(hidden)]

@@ -8,7 +8,7 @@ use thiserror::Error;
 /// A floating point type for use with Cauchy distributions.
 pub trait CauchyFloat: Float {
     #[doc(hidden)]
-    type P: Partition<Self> + ValidSymmetricPartitionSize<Self>;
+    type P: Partition<Self>;
     #[doc(hidden)]
     const TOLERANCE: Self;
     #[doc(hidden)]

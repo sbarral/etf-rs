@@ -5,11 +5,9 @@ use partition::*;
 use rand_core::RngCore;
 use std::marker::PhantomData;
 use storage::Datum;
-pub use table_validation::*;
 
 pub mod partition;
 mod storage;
-mod table_validation;
 pub mod util;
 
 /// Univariate function.
@@ -73,7 +71,7 @@ where
 
 impl<P, T, F> DistAny<P, T, F>
 where
-    P: ValidPartitionSize<T>,
+    P: Partition<T>,
     T: Float,
     F: UnivariateFn<T>,
 {
@@ -144,7 +142,7 @@ where
 
 impl<P, T, F, E> DistAnyTailed<P, T, F, E>
 where
-    P: ValidPartitionSize<T>,
+    P: Partition<T>,
     T: Float,
     F: UnivariateFn<T>,
     E: Envelope<T>,
@@ -229,7 +227,7 @@ where
 
 impl<P, T, F> DistCentral<P, T, F>
 where
-    P: ValidSymmetricPartitionSize<T>,
+    P: Partition<T>,
     T: Float,
     F: UnivariateFn<T>,
 {
@@ -308,7 +306,7 @@ where
 
 impl<P, T, F, E> DistCentralTailed<P, T, F, E>
 where
-    P: ValidSymmetricPartitionSize<T>,
+    P: Partition<T>,
     T: Float,
     F: UnivariateFn<T>,
     E: Envelope<T>,
@@ -398,7 +396,7 @@ where
 
 impl<P, T, F> DistSymmetric<P, T, F>
 where
-    P: ValidSymmetricPartitionSize<T>,
+    P: Partition<T>,
     T: Float,
     F: UnivariateFn<T>,
 {
@@ -479,7 +477,7 @@ where
 
 impl<P, T, F, E> DistSymmetricTailed<P, T, F, E>
 where
-    P: ValidSymmetricPartitionSize<T>,
+    P: Partition<T>,
     T: Float,
     F: UnivariateFn<T>,
     E: Envelope<T>,
