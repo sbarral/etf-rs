@@ -1,4 +1,4 @@
-use crate::common::{collisions, goodness_of_fit};
+use crate::common::{collisions, fair_goodness_of_fit};
 use etf::distributions::{Normal, CentralNormal};
 use etf::num::Float;
 
@@ -70,14 +70,11 @@ fn central_normal_64_collisions() {
 fn normal_32_fit() {
     let mean = 2.2_f64;
     let std_dev = 3.4_f64;
-    let n_sigma = 4.0_f64; // test interval half-width in standard deviation units
-
-    goodness_of_fit(
+    
+    fair_goodness_of_fit(
         Normal::new(mean as f32, std_dev as f32).unwrap(),
         |x| normal_cdf(x, mean, std_dev),
-        mean - n_sigma * std_dev,
-        mean + n_sigma * std_dev,
-        10_000_000,
+        50_000_000,
         401,
         0.01,
     );
@@ -87,14 +84,11 @@ fn normal_32_fit() {
 fn normal_64_fit() {
     let mean = 2.2_f64;
     let std_dev = 3.4_f64;
-    let n_sigma = 4.0_f64; // test interval half-width in std. dev. units
-
-    goodness_of_fit(
+    
+    fair_goodness_of_fit(
         Normal::new(mean as f64, std_dev as f64).unwrap(),
         |x| normal_cdf(x, mean, std_dev),
-        mean - n_sigma * std_dev,
-        mean + n_sigma * std_dev,
-        10_000_000,
+        50_000_000,
         401,
         0.01,
     );
@@ -103,14 +97,11 @@ fn normal_64_fit() {
 #[test]
 fn central_normal_32_fit() {
     let std_dev = 1.3_f64;
-    let n_sigma = 4.0_f64; // test interval half-width in standard deviation units
-
-    goodness_of_fit(
+    
+    fair_goodness_of_fit(
         CentralNormal::new(std_dev as f32).unwrap(),
         |x| normal_cdf(x, 0.0, std_dev),
-        - n_sigma * std_dev,
-        n_sigma * std_dev,
-        10_000_000,
+        50_000_000,
         401,
         0.01,
     );
@@ -119,14 +110,11 @@ fn central_normal_32_fit() {
 #[test]
 fn central_normal_64_fit() {
     let std_dev = 1.3_f64;
-    let n_sigma = 4.0_f64; // test interval half-width in std. dev. units
-
-    goodness_of_fit(
+    
+    fair_goodness_of_fit(
         CentralNormal::new(std_dev as f64).unwrap(),
         |x| normal_cdf(x, 0.0, std_dev),
-        - n_sigma * std_dev,
-        n_sigma * std_dev,
-        10_000_000,
+        50_000_000,
         401,
         0.01,
     );

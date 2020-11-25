@@ -51,7 +51,6 @@ pub struct ChiSquared<T: ChiSquaredFloat> {
         T::P,
         T,
         UnscaledPdf<T>,
-        //util::WeibullEnvelope<T, UnscaledPdf<T>>,
         HorizontalTailEnvelope<T>,
     >,
 }

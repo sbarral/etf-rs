@@ -101,7 +101,7 @@ pub fn chi_square_test<F: Fn(f64) -> f64>(histogram: Histogram, cdf: F) -> f64 {
     p_value
 }
 
-/// Assess goodness of fit based on a χ² test.
+/// Assess goodness of fit based on a χ² test using bins of equal width.
 #[allow(dead_code)]
 pub fn goodness_of_fit<T: TestFloat, D: Distribution<T>, F: Fn(f64) -> f64>(
     distribution: D,
@@ -123,6 +123,36 @@ pub fn goodness_of_fit<T: TestFloat, D: Distribution<T>, F: Fn(f64) -> f64>(
 
     // Process the data.
     let p_value = chi_square_test(histogram, cdf);
+    println!("P-value: {}", p_value);
+
+    assert!(p_value > p_value_threshold);
+}
+
+/// Assess goodness of fit based on a χ² test using bins having equi-probable
+/// expectation (fair dice).
+///
+/// This is significantly slower than the naive χ² test since the CDF is
+/// evaluated for each sample, but it is easier to use (no need to specify a
+/// sensible interval) and is probably a little better quality-wise.
+#[allow(dead_code)]
+pub fn fair_goodness_of_fit<T: TestFloat, D: Distribution<T>, F: Fn(f64) -> f64>(
+    distribution: D,
+    cdf: F,
+    sample_count: u64,
+    bin_count: usize,
+    p_value_threshold: f64,
+) {
+    // Sample the distribution.
+    let mut histogram = Histogram::new(0.0, 1.0, bin_count);
+    let mut rng = test_rng();
+    
+    for _ in 0..sample_count {
+        let r = distribution.sample(&mut rng);
+        histogram.add(cdf(r.as_f64()));
+    }
+
+    // Process the data.
+    let p_value = chi_square_test(histogram, |x| x);
     println!("P-value: {}", p_value);
 
     assert!(p_value > p_value_threshold);

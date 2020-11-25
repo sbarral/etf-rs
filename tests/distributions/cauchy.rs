@@ -1,4 +1,4 @@
-use crate::common::{collisions, goodness_of_fit};
+use crate::common::{collisions, fair_goodness_of_fit};
 use etf::distributions::Cauchy;
 use std::f64;
 
@@ -42,14 +42,11 @@ fn cauchy_64_collisions() {
 fn cauchy_32_fit() {
     let location = 2.2_f64;
     let scale = 3.4_f64;
-    let n_scale = 4.0_f64; // test interval half-width in scale units
-
-    goodness_of_fit(
+    
+    fair_goodness_of_fit(
         Cauchy::new(location as f32, scale as f32).unwrap(),
         |x| cauchy_cdf(x, location, scale),
-        location - n_scale * scale,
-        location + n_scale * scale,
-        10_000_000,
+        50_000_000,
         401,
         0.01,
     );
@@ -60,14 +57,11 @@ fn cauchy_32_fit() {
 fn cauchy_64_fit() {
     let location = 2.2_f64;
     let scale = 3.4_f64;
-    let n_scale = 4.0_f64; // test interval half-width in scale units
-
-    goodness_of_fit(
+    
+    fair_goodness_of_fit(
         Cauchy::new(location as f64, scale as f64).unwrap(),
         |x| cauchy_cdf(x, location, scale),
-        location - n_scale * scale,
-        location + n_scale * scale,
-        10_000_000,
+        50_000_000,
         401,
         0.01,
     );
