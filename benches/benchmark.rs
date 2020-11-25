@@ -1,5 +1,5 @@
 use criterion::{criterion_group, criterion_main, Criterion};
-use etf::distributions::{Cauchy, CentralNormal, Normal};
+use etf::distributions::{Cauchy, CentralNormal, Normal, ChiSquared};
 use etf::primitives::Distribution as _;
 use rand::distributions::Distribution;
 use rand_distr;
@@ -88,4 +88,20 @@ dist_benchmark_64!(
     rand_distr::Cauchy::new(1.0_f64, 2.0_f64).unwrap()
 );
 
-criterion_main!(central_normal_32, central_normal_64, normal_64, cauchy_32, cauchy_64);
+dist_benchmark_32!(
+    chi_squared_32,
+    etf_chi_squared_32_bench,
+    rand_chi_squared_32_bench,
+    ChiSquared::new(4.5_f32).unwrap(),
+    rand_distr::ChiSquared::new(4.5_f32).unwrap()
+);
+
+dist_benchmark_64!(
+    chi_squared_64,
+    etf_chi_squared_64_bench,
+    rand_chi_squared_64_bench,
+    ChiSquared::new(4.5_f64).unwrap(),
+    rand_distr::ChiSquared::new(4.5_f64).unwrap()
+);
+
+criterion_main!(central_normal_32, central_normal_64, normal_64, cauchy_32, cauchy_64, chi_squared_32, chi_squared_64);

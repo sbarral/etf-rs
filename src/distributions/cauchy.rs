@@ -17,11 +17,11 @@ pub trait CauchyFloat: Float {
 
 impl CauchyFloat for f32 {
     #[doc(hidden)]
-    type P = P128<f32>;
+    type P = P256<f32>;
     #[doc(hidden)]
     const TOLERANCE: Self = 1.0e-4;
     #[doc(hidden)]
-    const TAIL_POS: Self = 100.0;
+    const TAIL_POS: Self = 200.0;
 }
 
 impl CauchyFloat for f64 {
@@ -47,7 +47,7 @@ pub enum CauchyError {
 /// Cauchy distribution with arbitrary location and scale.
 #[derive(Clone)]
 pub struct Cauchy<T: CauchyFloat> {
-    inner: DistSymmetricTailed<T::P, T, UnscaledCauchyPdf<T>, CauchyTailEnvelope<T>>,
+    inner: DistSymmetricTailed<T::P, T, UnscaledPdf<T>, TailEnvelope<T>>,
 }
 
 impl<T: CauchyFloat> Cauchy<T> {
@@ -56,27 +56,25 @@ impl<T: CauchyFloat> Cauchy<T> {
         if scale <= T::ZERO {
             return Err(CauchyError::BadScale);
         }
+        let pdf = UnscaledPdf::new(location, scale);
         let square_inv_scale = T::ONE / (scale * scale);
-        let pdf = UnscaledCauchyPdf {
-            location,
-            square_inv_scale,
-        };
-        let dpdf = move |x: T| {
+        let minus_two_square_inv_scale = -T::TWO * square_inv_scale;
+        let dpdf = |x| {
             let dx = x - location;
 
-            let minus_dv = T::from(-2.0) * square_inv_scale * dx;
+            let minus_dv = minus_two_square_inv_scale * dx;
             let v = T::ONE + square_inv_scale * dx * dx;
 
             minus_dv / (v * v)
         };
 
         let tail_position = location + T::TAIL_POS * scale;
-        let tail_area = scale * (T::atan(-T::TAIL_POS) + T::from(0.5) * T::PI);
+        let tail_area = scale * (T::atan(-T::TAIL_POS) + T::ONE_HALF * T::PI);
         let init_nodes = util::midpoint_prepartition(&pdf, location, tail_position, 0);
         let table =
             util::newton_tabulation(&pdf, &dpdf, &init_nodes, &[], T::TOLERANCE, T::ONE, 50)
                 .map_err(|_| CauchyError::TabulationFailure)?;
-        let tail_func = CauchyTailEnvelope::new(location, scale, tail_position);
+        let tail_func = TailEnvelope::new(location, scale, tail_position);
         Ok(Self {
             inner: DistSymmetricTailed::new(location, pdf, &table, tail_func, tail_area),
         })
@@ -93,12 +91,21 @@ impl<T: CauchyFloat> Distribution<T> for Cauchy<T> {
 /// Non-normalized Cauchy probability distribution function with arbitrary
 /// location and scale.
 #[derive(Copy, Clone, Debug)]
-struct UnscaledCauchyPdf<T> {
+struct UnscaledPdf<T> {
     location: T,
     square_inv_scale: T,
 }
 
-impl<T: Float> UnivariateFn<T> for UnscaledCauchyPdf<T> {
+impl<T: Float> UnscaledPdf<T> {
+    fn new(location: T, scale: T) -> Self {
+        Self {
+            location,
+            square_inv_scale: T::ONE / (scale * scale),
+        }
+    }
+}
+
+impl<T: Float> UnivariateFn<T> for UnscaledPdf<T> {
     #[inline]
     fn eval(&self, x: T) -> T {
         let dx = x - self.location;
@@ -115,27 +122,27 @@ impl<T: Float> UnivariateFn<T> for UnscaledCauchyPdf<T> {
 }
 
 #[derive(Copy, Clone, Debug)]
-struct CauchyTailEnvelope<T> {
+struct TailEnvelope<T> {
     location: T,
     scale: T,
     a: T,
     b: T,
 }
 
-impl<T: Float> CauchyTailEnvelope<T> {
+impl<T: Float> TailEnvelope<T> {
     fn new(location: T, scale: T, cut_in: T) -> Self {
-        let fmin = T::atan((cut_in - location) / scale) / T::PI + T::from(0.5);
+        let fmin = T::atan((cut_in - location) / scale) / T::PI + T::ONE_HALF;
 
         Self {
             location,
             scale,
             a: T::PI * (T::ONE - fmin),
-            b: T::PI * (fmin - T::from(0.5)),
+            b: T::PI * (fmin - T::ONE_HALF),
         }
     }
 }
 
-impl<T: Float> Envelope<T> for CauchyTailEnvelope<T> {
+impl<T: Float> Envelope<T> for TailEnvelope<T> {
     #[inline(always)]
     fn try_sample<R: RngCore + ?Sized>(&self, rng: &mut R) -> Option<T> {
         Some(self.location + self.scale * T::tan(self.a * T::gen(rng) + self.b))

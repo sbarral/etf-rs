@@ -14,6 +14,7 @@ rand_pcg = "0.2"
 rand_xoshiro = "0.4"
 rand_distr = "0.2"
 criterion = "0.3"
+special = "0.8"
 
 [dependencies]
 rand_core = "0.5"

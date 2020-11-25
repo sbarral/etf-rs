@@ -130,6 +130,10 @@ pub trait Float:
     #[doc(hidden)]
     const ONE: Self;
     #[doc(hidden)]
+    const TWO: Self;
+    #[doc(hidden)]
+    const ONE_HALF: Self;
+    #[doc(hidden)]
     const INFINITY: Self;
     #[doc(hidden)]
     const PI: Self;
@@ -201,6 +205,10 @@ impl Float for f32 {
     const ZERO: Self = 0f32;
     #[doc(hidden)]
     const ONE: Self = 1f32;
+    #[doc(hidden)]
+    const TWO: Self = 2f32;
+    #[doc(hidden)]
+    const ONE_HALF: Self = 0.5f32;
     #[doc(hidden)]
     const INFINITY: Self = std::f32::INFINITY;
     #[doc(hidden)]
@@ -323,6 +331,10 @@ impl Float for f64 {
     const ZERO: Self = 0f64;
     #[doc(hidden)]
     const ONE: Self = 1f64;
+    #[doc(hidden)]
+    const TWO: Self = 2f64;
+    #[doc(hidden)]
+    const ONE_HALF: Self = 0.5f64;
     #[doc(hidden)]
     const INFINITY: Self = std::f64::INFINITY;
     #[doc(hidden)]

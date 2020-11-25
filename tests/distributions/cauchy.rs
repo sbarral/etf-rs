@@ -1,10 +1,10 @@
 use crate::common::{collisions, goodness_of_fit};
 use etf::distributions::Cauchy;
-use etf::num::Float;
+use std::f64;
 
-// CDF for normal distribution.
-pub fn cauchy_cdf(x: f64, location: f64, scale: f64) -> f64 {
-    ((x - location)/scale).atan() /f64::PI + 0.5
+// CDF for Cauchy distribution.
+fn cauchy_cdf(x: f64, location: f64, scale: f64) -> f64 {
+    ((x - location)/scale).atan() /f64::consts::PI + 0.5
 }
 
 #[test]

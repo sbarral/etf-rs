@@ -76,8 +76,9 @@ where
     F: UnivariateFn<T>,
 {
     pub fn new(func: F, table: &InitTable<P, T>) -> Self {
+        let max_switch = (T::UInt::ONE << (T::UInt::BITS - P::BITS)) - T::UInt::ONE;
         DistAny {
-            data: process_table(T::ZERO, table, T::UInt::MAX),
+            data: process_table(T::ZERO, table, max_switch),
             func: func,
         }
     }
@@ -99,8 +100,7 @@ where
             // Extract the significand from the rightmost bits.
             let u = r & u_mask;
 
-            // Extract the table index from the P::BITS leftmost bits after the
-            // sign bit.
+            // Extract the table index from the P::BITS leftmost bits.
             let i = (r >> (T::UInt::BITS - P::BITS)).as_usize();
 
             // Test for the common case (point below yinf).
@@ -148,7 +148,7 @@ where
     E: Envelope<T>,
 {
     pub fn new(func: F, table: &InitTable<P, T>, tail_envelope: E, tail_area: T) -> Self {
-        let tail_switch = compute_tail_switch(table, tail_area);
+        let tail_switch = compute_tail_switch(table, tail_area, false);
 
         DistAnyTailed {
             data: process_table(T::ZERO, table, tail_switch),
@@ -177,8 +177,7 @@ where
             // Extract the significand from the rightmost bits.
             let u = r & u_mask;
 
-            // Extract the table index from the P::BITS leftmost bits after the
-            // sign bit.
+            // Extract the table index from the P::BITS leftmost bits.
             let i = (r >> (T::UInt::BITS - P::BITS)).as_usize();
 
             // Test for the common case (point below yinf).
@@ -232,8 +231,9 @@ where
     F: UnivariateFn<T>,
 {
     pub fn new(func: F, table: &InitTable<P, T>) -> Self {
+        let max_switch = (T::UInt::ONE << (T::UInt::BITS - P::BITS - 1)) - T::UInt::ONE;
         DistCentral {
-            data: process_table(T::ZERO, table, T::UInt::MAX),
+            data: process_table(T::ZERO, table, max_switch),
             func: func,
             phantom_table_size: PhantomData,
         }
@@ -312,7 +312,7 @@ where
     E: Envelope<T>,
 {
     pub fn new(func: F, table: &InitTable<P, T>, tail_envelope: E, tail_area: T) -> Self {
-        let tail_switch = compute_tail_switch(table, tail_area);
+        let tail_switch = compute_tail_switch(table, tail_area, true);
         DistCentralTailed {
             data: process_table(T::ZERO, table, tail_switch),
             func,
@@ -401,8 +401,9 @@ where
     F: UnivariateFn<T>,
 {
     pub fn new(x0: T, func: F, table: &InitTable<P, T>) -> Self {
+        let max_switch = (T::UInt::ONE << (T::UInt::BITS - P::BITS - 1)) - T::UInt::ONE;
         DistSymmetric {
-            data: process_table(x0, table, T::UInt::MAX),
+            data: process_table(x0, table, max_switch),
             func: func,
             x0: x0,
             phantom_table_size: PhantomData,
@@ -483,7 +484,7 @@ where
     E: Envelope<T>,
 {
     pub fn new(x0: T, func: F, table: &InitTable<P, T>, tail_envelope: E, tail_area: T) -> Self {
-        let tail_switch = compute_tail_switch(table, tail_area);
+        let tail_switch = compute_tail_switch(table, tail_area, true);
 
         DistSymmetricTailed {
             data: process_table(x0, table, tail_switch),
@@ -623,7 +624,7 @@ where
 }
 
 // Computes the integer used as a threshold for tail sampling.
-fn compute_tail_switch<P, T>(init_table: &InitTable<P, T>, tail_area: T) -> T::UInt
+fn compute_tail_switch<P, T>(init_table: &InitTable<P, T>, tail_area: T, is_symmetric: bool) -> T::UInt
 where
     P: Partition<T>,
     T: Float,
@@ -636,6 +637,7 @@ where
     for i in 0..P::SIZE {
         area = area + (x[i + 1] - x[i]) * ysup[i];
     }
-    let max_switch = T::cast_uint((T::UInt::ONE << (T::UInt::BITS - P::BITS - 1)) - T::UInt::ONE);
+    let sign_bit_width = if is_symmetric { 1 } else { 0 };
+    let max_switch = T::cast_uint((T::UInt::ONE << (T::UInt::BITS - P::BITS - sign_bit_width)) - T::UInt::ONE);
     (max_switch * (area / (area + tail_area))).round_as_uint()
 }
