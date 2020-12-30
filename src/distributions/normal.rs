@@ -44,7 +44,17 @@ pub enum NormalError {
     BadStdDev,
 }
 
-/// Normal distribution with arbitrary mean and standard deviation.
+
+/// The normal distribution.
+///
+/// The probability density function is:
+///
+/// ```text
+/// f(x) = exp(-½ (x - μ)² / σ²) / (σ √(2π))
+/// ```
+///
+/// where `μ` is the mean and where the standard deviation `σ` is strictly
+/// positive.
 #[derive(Clone)]
 pub struct Normal<T: NormalFloat> {
     inner: DistSymmetricTailed<T::P, T, UnscaledPdf<T>, Tail<T>>,
@@ -78,13 +88,26 @@ impl<T: NormalFloat> Distribution<T> for Normal<T> {
     }
 }
 
-/// Central normal distribution with arbitrary standard deviation.
+/// The central normal distribution.
+///
+/// The probability density function is:
+///
+/// ```text
+/// f(x) = exp(-½ x² / σ²) / (σ √(2π))
+/// ```
+///
+/// where the standard deviation `σ` is strictly positive.
+///
+/// This distribution is slightly faster than the [`Normal`](struct.Normal.html) distribution with
+/// `μ=0`.
 #[derive(Clone)]
 pub struct CentralNormal<T: NormalFloat> {
     inner: DistCentralTailed<T::P, T, UnscaledCentralPdf<T>, Tail<T>>,
 }
 
 impl<T: NormalFloat> CentralNormal<T> {
+    /// Constructs a central normal distribution with the specified standard
+    /// deviation.
     pub fn new(std_dev: T) -> Result<Self, NormalError> {
         if std_dev <= T::ZERO {
             return Err(NormalError::BadStdDev);
@@ -112,7 +135,7 @@ impl<T: NormalFloat> Distribution<T> for CentralNormal<T> {
 #[derive(Copy, Clone, Debug)]
 struct UnscaledPdf<T> {
     mean: T,
-    alpha: T, // -1/(2*std_dev^2)
+    alpha: T, // -1/(2 std_dev^2)
 }
 
 impl<T: Float> UnscaledPdf<T> {
@@ -135,7 +158,7 @@ impl<T: Float> UnivariateFn<T> for UnscaledPdf<T> {
 
 #[derive(Copy, Clone, Debug)]
 struct UnscaledCentralPdf<T> {
-    alpha: T, // -1/(2*std_dev^2)
+    alpha: T, // -1/(2 std_dev^2)
 }
 
 impl<T: Float> UnscaledCentralPdf<T> {
@@ -160,13 +183,18 @@ struct Tail<T> {
     a_y: T,
 }
 
-impl<T: Float> Tail<T> {
-    fn new(mean: T, std_dev: T, cut_in: T) -> Self {
-        Self {
+impl<T: NormalFloat> Tail<T> {
+    fn new_with_area(mean: T, std_dev: T, cut_in: T) -> (Self, T) {
+        let tail = Self {
             cut_in,
             a_x: std_dev * std_dev / (cut_in - mean),
             a_y: T::from(-2_f32) * std_dev * std_dev,
-        }
+        };
+
+        let inv_sqrt_two = T::ONE_HALF.sqrt();
+        let area = T::PI.sqrt() * std_dev * inv_sqrt_two * (T::TAIL_POS * inv_sqrt_two).erfc();
+
+        (tail, area)
     }
 }
 
@@ -191,14 +219,11 @@ fn normal_parts<T: NormalFloat, F: UnivariateFn<T>, DF: UnivariateFn<T>>(
 ) -> Result<(InitTable<T::P, T>, Tail<T>, T), NormalError> {
     let tail_position = mean + T::TAIL_POS * std_dev;
 
-    let inv_sqrt_two = T::ONE_HALF.sqrt();
-    let tail_area = T::PI.sqrt() * std_dev * inv_sqrt_two * (T::TAIL_POS * inv_sqrt_two).erfc();
-
     // Build the distribution.
     let init_nodes = util::midpoint_prepartition(&pdf, mean, tail_position, 0);
     let table = util::newton_tabulation(&pdf, &dpdf, &init_nodes, &[], T::TOLERANCE, T::ONE, 10)
         .map_err(|_| NormalError::TabulationFailure)?;
-    let tail_func = Tail::new(mean, std_dev, tail_position);
+    let (tail_func, tail_area) = Tail::new_with_area(mean, std_dev, tail_position);
 
     Ok((table, tail_func, tail_area))
 }

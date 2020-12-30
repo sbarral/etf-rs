@@ -39,15 +39,24 @@ pub enum CauchyError {
     /// The ETF table could not be computed for the provided distribution parameters.
     #[error("could not compute an ETF table for the provided distribution parameters")]
     TabulationFailure,
-    /// The provided scale is not strictly positive.
-    #[error("the scale should be strictly positive")]
+    /// The provided scale parameter is not strictly positive.
+    #[error("the scale parameter should be strictly positive")]
     BadScale,
 }
 
-/// Cauchy distribution with arbitrary location and scale.
+/// The Cauchy distribution.
+///
+/// The probability density function is:
+///
+/// ```text
+/// f(x) = 𝛾 / (π((x - x₀)² + 𝛾²))
+/// ```
+///
+/// where `x₀` is the location parameter and where the scale parameter `𝛾` is
+/// strictly positive.
 #[derive(Clone)]
 pub struct Cauchy<T: CauchyFloat> {
-    inner: DistSymmetricTailed<T::P, T, UnscaledPdf<T>, TailEnvelope<T>>,
+    inner: DistSymmetricTailed<T::P, T, UnscaledPdf<T>, Tail<T>>,
 }
 
 impl<T: CauchyFloat> Cauchy<T> {
@@ -69,12 +78,11 @@ impl<T: CauchyFloat> Cauchy<T> {
         };
 
         let tail_position = location + T::TAIL_POS * scale;
-        let tail_area = scale * (T::atan(-T::TAIL_POS) + T::ONE_HALF * T::PI);
         let init_nodes = util::midpoint_prepartition(&pdf, location, tail_position, 0);
         let table =
             util::newton_tabulation(&pdf, &dpdf, &init_nodes, &[], T::TOLERANCE, T::ONE, 50)
                 .map_err(|_| CauchyError::TabulationFailure)?;
-        let tail_func = TailEnvelope::new(location, scale, tail_position);
+        let (tail_func, tail_area) = Tail::new_with_area(location, scale, tail_position);
         Ok(Self {
             inner: DistSymmetricTailed::new(location, pdf, &table, tail_func, tail_area),
         })
@@ -122,27 +130,32 @@ impl<T: Float> UnivariateFn<T> for UnscaledPdf<T> {
 }
 
 #[derive(Copy, Clone, Debug)]
-struct TailEnvelope<T> {
+struct Tail<T> {
     location: T,
     scale: T,
     a: T,
     b: T,
 }
 
-impl<T: Float> TailEnvelope<T> {
-    fn new(location: T, scale: T, cut_in: T) -> Self {
+impl<T: CauchyFloat> Tail<T> {
+    fn new_with_area(location: T, scale: T, cut_in: T) -> (Self, T) {
         let fmin = T::atan((cut_in - location) / scale) / T::PI + T::ONE_HALF;
 
-        Self {
+        let tail = Self {
             location,
             scale,
             a: T::PI * (T::ONE - fmin),
             b: T::PI * (fmin - T::ONE_HALF),
-        }
+        };
+        
+        let area = scale * (T::atan(-T::TAIL_POS) + T::ONE_HALF * T::PI);
+
+        (tail, area)
+        
     }
 }
 
-impl<T: Float> Envelope<T> for TailEnvelope<T> {
+impl<T: Float> Envelope<T> for Tail<T> {
     #[inline(always)]
     fn try_sample<R: RngCore + ?Sized>(&self, rng: &mut R) -> Option<T> {
         Some(self.location + self.scale * T::tan(self.a * T::gen(rng) + self.b))

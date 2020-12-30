@@ -1,9 +1,9 @@
 use criterion::{criterion_group, criterion_main, Criterion};
-use etf::distributions::{Cauchy, CentralNormal, Normal, ChiSquared};
+use etf::distributions::{Cauchy, CentralNormal, ChiSquared, Normal};
 use etf::primitives::Distribution as _;
 use rand::distributions::Distribution;
-use rand_distr;
 use rand_core::SeedableRng;
+use rand_distr;
 use rand_xoshiro::{Xoshiro128StarStar, Xoshiro256StarStar};
 
 macro_rules! dist_benchmark_32 {
@@ -89,19 +89,63 @@ dist_benchmark_64!(
 );
 
 dist_benchmark_32!(
-    chi_squared_32,
-    etf_chi_squared_32_bench,
-    rand_chi_squared_32_bench,
-    ChiSquared::new(4.5_f32).unwrap(),
-    rand_distr::ChiSquared::new(4.5_f32).unwrap()
+    chi_squared_32_k2,
+    etf_chi_squared_32_k2_bench,
+    rand_chi_squared_32_k2_bench,
+    ChiSquared::new(2_f32).unwrap(),
+    rand_distr::ChiSquared::new(2_f32).unwrap()
 );
 
 dist_benchmark_64!(
-    chi_squared_64,
-    etf_chi_squared_64_bench,
-    rand_chi_squared_64_bench,
-    ChiSquared::new(4.5_f64).unwrap(),
-    rand_distr::ChiSquared::new(4.5_f64).unwrap()
+    chi_squared_64_k2,
+    etf_chi_squared_64_k2_bench,
+    rand_chi_squared_64_k2_bench,
+    ChiSquared::new(2_f64).unwrap(),
+    rand_distr::ChiSquared::new(2_f64).unwrap()
 );
 
-criterion_main!(central_normal_32, central_normal_64, normal_64, cauchy_32, cauchy_64, chi_squared_32, chi_squared_64);
+dist_benchmark_32!(
+    chi_squared_32_k5,
+    etf_chi_squared_32_k5_bench,
+    rand_chi_squared_32_k5_bench,
+    ChiSquared::new(5_f32).unwrap(),
+    rand_distr::ChiSquared::new(5_f32).unwrap()
+);
+
+dist_benchmark_64!(
+    chi_squared_64_k5,
+    etf_chi_squared_64_k5_bench,
+    rand_chi_squared_64_k5_bench,
+    ChiSquared::new(5_f64).unwrap(),
+    rand_distr::ChiSquared::new(5_f64).unwrap()
+);
+
+dist_benchmark_32!(
+    chi_squared_32_k1000,
+    etf_chi_squared_32_k1000_bench,
+    rand_chi_squared_32_k1000_bench,
+    ChiSquared::new(1000_f32).unwrap(),
+    rand_distr::ChiSquared::new(1000_f32).unwrap()
+);
+
+dist_benchmark_64!(
+    chi_squared_64_k1000,
+    etf_chi_squared_64_k1000_bench,
+    rand_chi_squared_64_k1000_bench,
+    ChiSquared::new(1000_f64).unwrap(),
+    rand_distr::ChiSquared::new(1000_f64).unwrap()
+);
+
+criterion_main!(
+    central_normal_32,
+    central_normal_64,
+    normal_64,
+    cauchy_32,
+    cauchy_64,
+    chi_squared_32_k2,
+    chi_squared_64_k2,
+    chi_squared_32_k5,
+    chi_squared_64_k5,
+    chi_squared_32_k1000,
+    chi_squared_64_k1000,
+);
