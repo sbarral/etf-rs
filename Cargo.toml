@@ -11,17 +11,17 @@ fma = []
 rand_distribution = ["rand_distr"]
 
 [dev-dependencies]
-rand = "0.7"
-rand_pcg = "0.2"
-rand_xoshiro = "0.4"
-rand_distr = "0.2"
+rand = "0.8.5"
+rand_pcg = "0.3.1"
+rand_xoshiro = "0.6.0"
+rand_distr = "0.4.3"
 criterion = "0.3"
-special = "0.8.1"
+special = "0.10.3"
 
 [dependencies]
-rand_core = "0.5"
+rand_core = "0.6.4"
 thiserror = "1.0"
-rand_distr = { version = "0.2", optional = true }
+rand_distr = { version = "0.4.3", optional = true }
 
 
 [profile.release]
