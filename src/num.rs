@@ -113,6 +113,7 @@ pub trait Float:
     + Display
     + PartialOrd
     + From<f32>
+    + Into<f64>
     + Add<Output = Self>
     + Sub<Output = Self>
     + Mul<Output = Self>

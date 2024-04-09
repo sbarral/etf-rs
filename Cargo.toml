@@ -7,6 +7,8 @@ edition = "2018"
 [features]
 # Use fused multiply-add (may actually be slower, even if supported by the target arch).
 fma = []
+# Use the rand_distr::Distribution trait instead of the native one.
+rand_distribution = ["rand_distr"]
 
 [dev-dependencies]
 rand = "0.7"
@@ -14,11 +16,13 @@ rand_pcg = "0.2"
 rand_xoshiro = "0.4"
 rand_distr = "0.2"
 criterion = "0.3"
-special = "0.8"
+special = "0.8.1"
 
 [dependencies]
 rand_core = "0.5"
 thiserror = "1.0"
+rand_distr = { version = "0.2", optional = true }
+
 
 [profile.release]
 #lto = true

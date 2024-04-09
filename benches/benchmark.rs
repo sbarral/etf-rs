@@ -89,6 +89,22 @@ dist_benchmark_64!(
 );
 
 dist_benchmark_32!(
+    chi_squared_32_k0_5,
+    etf_chi_squared_32_k0_5_bench,
+    rand_chi_squared_32_k0_5_bench,
+    ChiSquared::new(0.5_f32).unwrap(),
+    rand_distr::ChiSquared::new(0.5_f32).unwrap()
+);
+
+dist_benchmark_64!(
+    chi_squared_64_k0_5,
+    etf_chi_squared_64_k0_5_bench,
+    rand_chi_squared_64_k0_5_bench,
+    ChiSquared::new(0.5_f64).unwrap(),
+    rand_distr::ChiSquared::new(0.5_f64).unwrap()
+);
+
+dist_benchmark_32!(
     chi_squared_32_k2,
     etf_chi_squared_32_k2_bench,
     rand_chi_squared_32_k2_bench,
@@ -142,6 +158,8 @@ criterion_main!(
     normal_64,
     cauchy_32,
     cauchy_64,
+    chi_squared_32_k0_5,
+    chi_squared_64_k0_5,
     chi_squared_32_k2,
     chi_squared_64_k2,
     chi_squared_32_k5,

@@ -155,7 +155,7 @@ impl<T: CauchyFloat> Tail<T> {
     }
 }
 
-impl<T: Float> Envelope<T> for Tail<T> {
+impl<T: Float> TryDistribution<T> for Tail<T> {
     #[inline(always)]
     fn try_sample<R: RngCore + ?Sized>(&self, rng: &mut R) -> Option<T> {
         Some(self.location + self.scale * T::tan(self.a * T::gen(rng) + self.b))

@@ -1,6 +1,6 @@
 //! Utilites for ETF distributions generation.
 
-use super::{Envelope, InitTable, NodeArray, Partition, UnivariateFn};
+use super::{TryDistribution, InitTable, NodeArray, Partition, UnivariateFn};
 use crate::num::Float;
 use rand_core::RngCore;
 use thiserror::Error;
@@ -369,7 +369,7 @@ impl<T: Float, F: UnivariateFn<T>> WeibullEnvelope<T, F> {
     }
 }
 
-impl<T: Float, F: UnivariateFn<T>> Envelope<T> for WeibullEnvelope<T, F> {
+impl<T: Float, F: UnivariateFn<T>> TryDistribution<T> for WeibullEnvelope<T, F> {
     fn try_sample<R: RngCore + ?Sized>(&self, rng: &mut R) -> Option<T> {
         let r = T::gen(rng);
         let x = self.c + self.b * T::powf(self.alpha - T::ln(T::ONE - r), self.inv_a);

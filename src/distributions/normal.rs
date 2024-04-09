@@ -198,7 +198,7 @@ impl<T: NormalFloat> Tail<T> {
     }
 }
 
-impl<T: Float> Envelope<T> for Tail<T> {
+impl<T: Float> TryDistribution<T> for Tail<T> {
     #[inline]
     fn try_sample<R: RngCore + ?Sized>(&self, rng: &mut R) -> Option<T> {
         loop {
