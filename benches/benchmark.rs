@@ -1,5 +1,5 @@
 use criterion::{criterion_group, criterion_main, Criterion};
-use etf::distributions::{Cauchy, CentralNormal, ChiSquared, Normal};
+use etf::distributions::{Cauchy, CentralNormal, ChiSquared, Gumbel, Normal};
 use etf::primitives::Distribution as _;
 use rand::distributions::Distribution;
 use rand_core::SeedableRng;
@@ -89,6 +89,22 @@ dist_benchmark_64!(
 );
 
 dist_benchmark_32!(
+    gumbel_32,
+    etf_gumberl_32_bench,
+    rand_gumbel_32_bench,
+    Gumbel::new(1.0_f32, 2.0_f32).unwrap(),
+    rand_distr::Gumbel::new(1.0_f32, 2.0_f32).unwrap()
+);
+
+dist_benchmark_64!(
+    gumbel_64,
+    etf_gumbel_64_bench,
+    rand_gumbel_64_bench,
+    Gumbel::new(1.0_f64, 2.0_f64).unwrap(),
+    rand_distr::Gumbel::new(1.0_f64, 2.0_f64).unwrap()
+);
+
+dist_benchmark_32!(
     chi_squared_32_k0_5,
     etf_chi_squared_32_k0_5_bench,
     rand_chi_squared_32_k0_5_bench,
@@ -158,6 +174,8 @@ criterion_main!(
     normal_64,
     cauchy_32,
     cauchy_64,
+    gumbel_32,
+    gumbel_64,
     chi_squared_32_k0_5,
     chi_squared_64_k0_5,
     chi_squared_32_k2,

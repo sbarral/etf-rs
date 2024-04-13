@@ -85,7 +85,7 @@ where
         let max_switch = (T::UInt::ONE << (T::UInt::BITS - P::BITS)) - T::UInt::ONE;
         DistAny {
             data: process_table(T::ZERO, table, max_switch),
-            func: func,
+            func,
         }
     }
 }
@@ -158,9 +158,9 @@ where
 
         DistAnyTailed {
             data: process_table(T::ZERO, table, tail_switch),
-            func: func,
-            tail_envelope: tail_envelope,
-            tail_switch: tail_switch,
+            func,
+            tail_envelope,
+            tail_switch,
             phantom_table_size: PhantomData,
         }
     }
@@ -185,7 +185,7 @@ where
 
             // Extract the table index from the P::BITS leftmost bits.
             let i = (r >> (T::UInt::BITS - P::BITS)).as_usize();
-            
+
             // Test for the common case (point below yinf).
             let d = &self.data.table[i];
             if u <= d.wedge_switch {
@@ -240,7 +240,7 @@ where
         let max_switch = (T::UInt::ONE << (T::UInt::BITS - P::BITS - 1)) - T::UInt::ONE;
         DistCentral {
             data: process_table(T::ZERO, table, max_switch),
-            func: func,
+            func,
             phantom_table_size: PhantomData,
         }
     }
@@ -410,8 +410,8 @@ where
         let max_switch = (T::UInt::ONE << (T::UInt::BITS - P::BITS - 1)) - T::UInt::ONE;
         DistSymmetric {
             data: process_table(x0, table, max_switch),
-            func: func,
-            x0: x0,
+            func,
+            x0,
             phantom_table_size: PhantomData,
         }
     }
@@ -494,10 +494,10 @@ where
 
         DistSymmetricTailed {
             data: process_table(x0, table, tail_switch),
-            func: func,
-            x0: x0,
-            tail_envelope: tail_envelope,
-            tail_switch: tail_switch,
+            func,
+            x0,
+            tail_envelope,
+            tail_switch,
             phantom_table_size: PhantomData,
         }
     }
@@ -605,7 +605,7 @@ where
             // Degraded case: force wedge sampling algorithm.
             (T::UInt::ZERO, T::ZERO)
         };
-        
+
         table[i] = Datum {
             alpha,
             beta: x[i] - x0,
@@ -639,16 +639,16 @@ where
     P: Partition<T>,
     T: Float,
 {
-    // Convenient aliases.
     let x = &init_table.x;
     let ysup = &init_table.ysup;
 
     let mut area = T::ZERO;
     for i in 0..P::SIZE {
-        area = area + (x[i + 1] - x[i]) * ysup[i];
+        area += (x[i + 1] - x[i]) * ysup[i];
     }
     let sign_bit_width = if is_symmetric { 1 } else { 0 };
     let max_switch =
         T::cast_uint((T::UInt::ONE << (T::UInt::BITS - P::BITS - sign_bit_width)) - T::UInt::ONE);
+
     (max_switch * (area / (area + tail_area))).round_as_uint()
 }

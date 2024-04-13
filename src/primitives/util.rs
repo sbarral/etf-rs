@@ -1,6 +1,6 @@
 //! Utilites for ETF distributions generation.
 
-use super::{TryDistribution, InitTable, NodeArray, Partition, UnivariateFn};
+use super::{InitTable, NodeArray, Partition, TryDistribution, UnivariateFn};
 use crate::num::Float;
 use rand_core::RngCore;
 use thiserror::Error;
@@ -58,8 +58,8 @@ where
             // Integrate `f` from `x0` until `a` is smaller than `a_rect`.
             while a_rect < a {
                 rect += 1;
-                a_rect = a_rect + y[rect];
-                x_rect = x_rect + dx;
+                a_rect += y[rect];
+                x_rect += dx;
             }
 
             // Interpolate `x`.
@@ -120,8 +120,10 @@ where
     DF: UnivariateFn<T>,
 {
     // Initialize the quadrature table partition with the initial partition.
-    let mut table = InitTable::default();
-    table.x = x_init.clone();
+    let mut table = InitTable::<P, T> {
+        x: x_init.clone(),
+        ..Default::default()
+    };
 
     // Main vectors.
     let n = P::SIZE;
@@ -202,7 +204,7 @@ where
             let area = ysup[i] * (x[i + 1] - x[i]).abs();
             max_area = max_area.max(area);
             min_area = min_area.min(area);
-            sum_area = sum_area + area;
+            sum_area += area;
         }
 
         // Return the table if convergence was achieved.
@@ -396,8 +398,8 @@ fn solve_tma<T: Float>(a: &[T], b: &mut [T], c: &[T], rhs: &mut [T], sol: &mut [
     // Eliminate the sub-diagonal.
     for i in 1..m {
         let pivot = a[i] / b[i - 1];
-        b[i] = b[i] - pivot * c[i - 1];
-        rhs[i] = rhs[i] - pivot * rhs[i - 1];
+        b[i] -= pivot * c[i - 1];
+        rhs[i] -= pivot * rhs[i - 1];
     }
 
     // Solve the remaining upper bi-diagonal system.

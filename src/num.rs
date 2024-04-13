@@ -463,7 +463,7 @@ mod private {
 }
 
 mod cmath {
-    /// System-provided special functions.
+    // System-provided special functions.
     #[link(name = "m")]
     extern "C" {
         pub fn erff(x: f32) -> f32;

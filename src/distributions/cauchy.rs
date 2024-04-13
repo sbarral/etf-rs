@@ -82,7 +82,7 @@ impl<T: CauchyFloat> Cauchy<T> {
         let table =
             util::newton_tabulation(&pdf, &dpdf, &init_nodes, &[], T::TOLERANCE, T::ONE, 50)
                 .map_err(|_| CauchyError::TabulationFailure)?;
-        let (tail_func, tail_area) = Tail::new_with_area(location, scale, tail_position);
+        let (tail_func, tail_area) = Tail::new_with_area(location, scale);
         Ok(Self {
             inner: DistSymmetricTailed::new(location, pdf, &table, tail_func, tail_area),
         })
@@ -138,8 +138,8 @@ struct Tail<T> {
 }
 
 impl<T: CauchyFloat> Tail<T> {
-    fn new_with_area(location: T, scale: T, cut_in: T) -> (Self, T) {
-        let fmin = T::atan((cut_in - location) / scale) / T::PI + T::ONE_HALF;
+    fn new_with_area(location: T, scale: T) -> (Self, T) {
+        let fmin = T::atan(T::TAIL_POS) / T::PI + T::ONE_HALF;
 
         let tail = Self {
             location,
@@ -147,11 +147,10 @@ impl<T: CauchyFloat> Tail<T> {
             a: T::PI * (T::ONE - fmin),
             b: T::PI * (fmin - T::ONE_HALF),
         };
-        
+
         let area = scale * (T::atan(-T::TAIL_POS) + T::ONE_HALF * T::PI);
 
         (tail, area)
-        
     }
 }
 

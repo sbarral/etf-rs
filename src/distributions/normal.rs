@@ -44,7 +44,6 @@ pub enum NormalError {
     BadStdDev,
 }
 
-
 /// The normal distribution.
 ///
 /// The probability density function is:
@@ -211,6 +210,7 @@ impl<T: Float> TryDistribution<T> for Tail<T> {
     }
 }
 
+#[allow(clippy::type_complexity)]
 fn normal_parts<T: NormalFloat, F: UnivariateFn<T>, DF: UnivariateFn<T>>(
     mean: T,
     std_dev: T,

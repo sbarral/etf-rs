@@ -15,17 +15,13 @@ rand = "0.8.5"
 rand_pcg = "0.3.1"
 rand_xoshiro = "0.6.0"
 rand_distr = "0.4.3"
-criterion = "0.3"
+criterion = "0.5"
 special = "0.10.3"
 
 [dependencies]
 rand_core = "0.6.4"
 thiserror = "1.0"
 rand_distr = { version = "0.4.3", optional = true }
-
-
-[profile.release]
-#lto = true
 
 [[bench]]
 name = "benchmark"
